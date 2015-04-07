@@ -3,6 +3,50 @@
 # Rob Garrett
 # With the help from http://autospinstaller.codeplex.com/
 
+$global:sqlPSReg = "HKLM:\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.SqlServer.Management.PowerShell.sqlps";
+$global:sqlPSPath = "";
+
+function SQL-RegisterPS {
+    # Check the Registry
+    if (Get-ChildItem $global:sqlPSReg -ErrorAction SilentlyContinue) {
+        throw "SQL Server PowerShell is not installed";
+    } else {
+        $item = Get-ItemProperty $global:sqlPSReg;
+        $global:sqlPSPath = [System.IO.Path]::GetDirectoryName($item.Path);
+        # Preload assemblies
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Dmf");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SqlWmiManagement");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SmoExtended");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.RegisteredServers");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.Sdk.Sfc");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.SqlEnum");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.RegSvrEnum");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.WmiEnum");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ServiceBrokerEnum");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfoExtended");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.Collector");
+        [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.CollectorEnum");
+        # Set variables that provider expects.
+        Set-Variable -scope Global -name SqlServerMaximumChildItems -Value 0;
+        Set-Variable -scope Global -name SqlServerConnectionTimeout -Value 30;
+        Set-Variable -scope Global -name SqlServerIncludeSystemObjects -Value $true;
+        Set-Variable -scope Global -name SqlServerMaximumTabCompletion -Value 1000;
+        Push-Location;
+        cd $global:sqlPSPath;
+        if ( (Get-PSSnapin -Name SqlServerCmdletSnapin100 -ErrorAction SilentlyContinue) -eq $null ) {
+            Add-PsSnapin SqlServerCmdletSnapin100;
+        }
+        if ( (Get-PSSnapin -Name SqlServerProviderSnapin100 -ErrorAction SilentlyContinue) -eq $null ) {
+            Add-PsSnapin SqlServerProviderSnapin100;
+        }
+        Update-TypeData -PrependPath SQLProvider.Types.ps1xml -ErrorAction SilentlyContinue;
+        Update-FormatData -PrependPath SQLProvider.Format.ps1xml -ErrorAction SilentlyContinue;
+        Pop-Location;
+    }
+}
+
 function SQL-CreateAlias {
     # Ensure that we create an alias for the primary SQL server.
     # Primary server can be a high-availability group.
