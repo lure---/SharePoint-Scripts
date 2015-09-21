@@ -3,6 +3,7 @@
 # Rob Garrett
 # With the help from http://autospinstaller.codeplex.com/
 
+[CmdletBinding()]
 param ([bool]$localExec = $true)
 
 $0 = $myInvocation.MyCommand.Definition
@@ -22,18 +23,18 @@ Use-RunAs;
 try {
     # Standard provisioning steps.
     SP-ExecCommonSPServerProvisioning
-    # Create CA
+    # Create CA web site
     SP-CreateCentralAdmin;
     # Configure C2WTS.
-    SP-ConfigureClaimsToWindowsTokenService;
+    #SP-ConfigureClaimsToWindowsTokenService;
     # Configure ULS
-    SP-ConfigureDiagnosticLogging;
+    #SP-ConfigureDiagnosticLogging;
     # Install Language Packs
-    SP-ConfigureLanguagePacks;
+    #SP-ConfigureLanguagePacks;
     # Configure email.
-    SP-ConfigureEmail;
+    #SP-ConfigureEmail;
     # Post Configuration
-    SP-PostInstallation;
+    #SP-PostInstallation;
 }
 catch {
     Write-Host -ForegroundColor Red "Critial Error: " $_.Exception.Message;

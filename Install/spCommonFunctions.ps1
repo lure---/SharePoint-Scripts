@@ -75,6 +75,9 @@ function SP-RegisterPS {
     if ($ver.Version.Major -gt 1)  {$Host.Runspace.ThreadOptions = "ReuseThread"}
     if ( (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue) -eq $null ) {
         Add-PsSnapin Microsoft.SharePoint.PowerShell
+        Write-Verbose "SharePoint PowerShell Snapin installed";
+    } else {
+        Write-Verbose "SharePoint PowerShell Snapin already installed";
     }
     Set-location $home
 }
