@@ -9,9 +9,7 @@ function SP-ExecCommonSPServerProvisioning {
     # Disable loopback check.
     SP-DisableLoopback;
     # Create Farm
-    #SP-CreateOrJoinFarm;
-    # Configure new or existing farm
-    #SP-ConfigureFarm;
+    SP-CreateOrJoinFarm;
 }
 
 function SP-GetFarmCredential {
@@ -69,6 +67,8 @@ function SP-CreateOrJoinFarm {
         else {
             $farmMessage = "Done joining farm."
         }
+        # Configure new or existing farm
+        SP-ConfigureFarm;
     }
     else {
         $farmMessage = "$env:COMPUTERNAME is already joined to farm on `"$configDB`"."
@@ -95,45 +95,21 @@ function SP-ConfigureFarm {
     $configDB = $global:dbPrefix + "_Config_Farm";
     $spFarm = Get-SPFarm | Where-Object {$_.Name -eq $configDB}
     if ($spFarm -ne $null) {
-        Write-Verbose "Detecting servers in the farm"
-        foreach ($srv in $spFarm.Servers) {
-            if (($srv -like "*$global:dbServer*") -and ($global:dbServer -ne $env:COMPUTERNAME)) {
-                [bool]$dbLocal = $false
-            }
-        }
-        # If we have two servers and the other server is a DB server then we're the first
-        # SP server
-        if (($dbLocal -eq $false) -and ($($spFarm.Servers.Count) -eq 2)) {
-            [bool]$firstServer = $true
-        # If database is local and we only have one server, then this has to be the first
-        # SP server
-        } else { if (($dbLocal -eq $true) -and ($($spFarm.Servers.Count) -eq 1)) {
-            [bool]$firstServer = $true
-        } else {
-            [bool]$firstServer = $false
-        }}
-        # Force a full configuration if this is the first web/app server in the farm
-        if (($firstServer -eq $true) -or (SP-CheckIfUpgradeNeeded -eq $true)) {[bool]$doFullConfig = $true}
-        # Are we doing a full config?
-        if ($doFullConfig) {
-            # Install Help Files
-            Write-Verbose "Installing Help Collection..."
-            Install-SPHelpCollection -All
-        }
+        # Install Help Files
+        Write-Verbose "Installing Help Collection..."
+        Install-SPHelpCollection -All
         # Secure resources
         Write-Verbose "Securing Resources..."
         Initialize-SPResourceSecurity;
         # Install Services
-        Write-Verbose "Installing Services..."
-        Install-SPService;
-        if ($doFullConfig) {
-            # Install (all) features
-            Write-Verbose "Installing Features..."
-            $features = Install-SPFeature -AllExistingFeatures -Force;
-            # Create application content.
-            Write-Verbose "Installing Application Content..."
-            Install-SPApplicationContent
-        }
+        Write-Verbose "Installing Services";
+        Install-SPService
+        # Install (all) features
+        Write-Verbose "Installing Features..."
+        $features = Install-SPFeature -AllExistingFeatures;
+        # Create application content.
+        Write-Verbose "Installing Application Content..."
+        Install-SPApplicationContent
         # Configure managed accounts
         SP-CreateManagedAccounts;
         # Check again if we need to run PSConfig, in case a CU was installed

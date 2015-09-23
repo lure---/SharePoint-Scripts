@@ -2,6 +2,7 @@
 # Install Workflow Manager.
 # Rob Garrett
 
+[CmdletBinding()]
 param ([bool]$localExec = $true)
 
 $0 = $myInvocation.MyCommand.Definition

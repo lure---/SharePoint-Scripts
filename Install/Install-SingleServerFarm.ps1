@@ -3,6 +3,7 @@
 # Rob Garrett
 # With the help from http://autospinstaller.codeplex.com/
 
+[CmdletBinding()]
 param ([bool]$localExec = $true)
 
 $0 = $myInvocation.MyCommand.Definition
@@ -14,7 +15,6 @@ $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
 . "$env:dp0\spCommonFunctions.ps1"
 . "$env:dp0\spSQLFunctions.ps1"
 . "$env:dp0\spFarmFunctions.ps1"
-. "$env:dp0\spRemoteFunctions.ps1"
 . "$env:dp0\spServiceFunctions.ps1"
 . "$env:dp0\spSearchFunctions.ps1"
 . "$env:dp0\spWFMFunctions.ps1"
@@ -55,7 +55,6 @@ try {
     #SP-CreateMachineTranslationServiceApp;
     #SP-CreateAccessServicesApp;
     #SP-CreatePowerPointConversionServiceApp;
-	SP-ConfigureDistributedCacheService;
     # Search.
     SP-CreateEnterpriseSearchServiceApp;
     # Post Configuration

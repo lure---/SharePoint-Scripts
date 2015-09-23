@@ -17,14 +17,14 @@ function WFM-DownloadAndInstall {
 
 function WFM-Configure {
     # Create new SB Farm
-    $svcAccountName = $spFarmAcctName;
-    $svcAccountPwd = $spFarmAcctPwd;
+    $svcAccountName = $global:spFarmAcctName;
+    $svcAccountPwd = $global:spFarmAcctPwd;
     $SBCertificateAutoGenerationKey = ConvertTo-SecureString -AsPlainText  -Force  -String $passphrase;
     $WFCertAutoGenerationKey = ConvertTo-SecureString -AsPlainText  -Force  -String $passphrase;
-    $managementCS = 'Data Source=' + $dbServer + ';Initial Catalog=' + $dbPrefix + '_WFMSB_Management;Integrated Security=True;Encrypt=False';
-    $gatewayCS = 'Data Source=' + $dbServer + ';Initial Catalog=' + $dbPrefix + '_WFMSB_Gateway;Integrated Security=True;Encrypt=False';
-    $messageContCS = 'Data Source=' + $dbServer + ';Initial Catalog=' + $dbPrefix + '_WFMSB_MessageContainer;Integrated Security=True;Encrypt=False';
-    Write-Host -ForegroundColor White ' - Creating new Service Bus farm...' -NoNewline;
+    $managementCS = 'Data Source=' + $global:dbServer + ';Initial Catalog=' + $global:dbPrefix + '_WFMSB_Management;Integrated Security=True;Encrypt=False';
+    $gatewayCS = 'Data Source=' + $global:dbServer + ';Initial Catalog=' + $global:dbPrefix + '_WFMSB_Gateway;Integrated Security=True;Encrypt=False';
+    $messageContCS = 'Data Source=' + $global:dbServer + ';Initial Catalog=' + $global:dbPrefix + '_WFMSB_MessageContainer;Integrated Security=True;Encrypt=False';
+    Write-Host -ForegroundColor White 'Creating new Service Bus farm...' -NoNewline;
     try {
         $sbFarm = Get-SBFarm -SBFarmDBConnectionString $managementCS;
         Write-Host -ForegroundColor White 'Already Exists';
@@ -37,9 +37,9 @@ function WFM-Configure {
     }
     # Create new WF Farm
     Write-Host -ForegroundColor white " - Creating new Workflow Farm..." -NoNewline;
-    $wfManagementCS = 'Data Source=' + $dbServer + ';Initial Catalog=' + $dbPrefix + '_WFM_Management;Integrated Security=True;Encrypt=False';
-    $wfInstanceCS = 'Data Source=' + $dbServer + ';Initial Catalog=' + $dbPrefix + '_WFM_InstanceManagement;Integrated Security=True;Encrypt=False';
-    $wfResourceCS = 'Data Source=' + $dbServer + ';Initial Catalog=' + $dbPrefix + '_WFM_ResourceManagement;Integrated Security=True;Encrypt=False';
+    $wfManagementCS = 'Data Source=' + $global:dbServer + ';Initial Catalog=' + $global:dbPrefix + '_WFM_Management;Integrated Security=True;Encrypt=False';
+    $wfInstanceCS = 'Data Source=' + $global:dbServer + ';Initial Catalog=' + $global:dbPrefix + '_WFM_InstanceManagement;Integrated Security=True;Encrypt=False';
+    $wfResourceCS = 'Data Source=' + $global:dbServer + ';Initial Catalog=' + $global:dbPrefix + '_WFM_ResourceManagement;Integrated Security=True;Encrypt=False';
     try {
         $wfFarm = Get-WFFarm -WFFarmDBConnectionString $wfManagementCS;
         Write-Host -ForegroundColor White 'Already Exists';
@@ -61,7 +61,7 @@ function WFM-Configure {
         Write-Host -ForegroundColor white 'Already Exists';
     }
     Write-Host -ForegroundColor white ' - Creating Workflow Default Namespace...' -NoNewline;
-    $sbNamespace = $dbPrefix + '-WorkflowNamespace';
+    $sbNamespace = $global:dbPrefix + '-WorkflowNamespace';
     try {
         $defaultNS = Get-SBNamespace -Name $sbNamespace -ErrorAction SilentlyContinue;
         Write-Host -ForegroundColor white 'Already Exists';

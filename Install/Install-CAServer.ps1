@@ -15,7 +15,6 @@ $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
 . "$env:dp0\spCommonFunctions.ps1"
 . "$env:dp0\spSQLFunctions.ps1"
 . "$env:dp0\spFarmFunctions.ps1"
-. "$env:dp0\spRemoteFunctions.ps1"
 . "$env:dp0\spServiceFunctions.ps1"
  
 # Make sure we're running as elevated.

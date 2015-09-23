@@ -6,7 +6,7 @@
 function UpdateProcessIdentity ($serviceToUpdate, $svcName = $null) {
     # Update service to use SP service account.
     # Managed Account
-    if ($svcName -eq $null) { $svcName = $spServiceAcctName; }
+    if ($svcName -eq $null) { $svcName = $global:spServiceAcctName; }
     $managedAccountGen = Get-SPManagedAccount | Where-Object {$_.UserName -eq $($svcName)}
     if ($managedAccountGen -eq $null) { Throw "Managed Account $($svcName) not found" }
     if ($serviceToUpdate.Service) {$serviceToUpdate = $serviceToUpdate.Service}
@@ -25,7 +25,7 @@ function UpdateProcessIdentity ($serviceToUpdate, $svcName = $null) {
 
 function Get-HostedServicesAppPool {
     # Managed Account
-    $managedAccountGen = Get-SPManagedAccount | Where-Object {$_.UserName -eq $($spServiceAcctName)}
+    $managedAccountGen = Get-SPManagedAccount | Where-Object {$_.UserName -eq $($global:spServiceAcctName)}
     if ($managedAccountGen -eq $null) { Throw "Managed Account $($spservice.username) not found" }
     # App Pool
     $applicationPool = Get-SPServiceApplicationPool "SharePoint Hosted Services" -ea SilentlyContinue
@@ -184,15 +184,8 @@ function SP-ConfigureClaimsToWindowsTokenService {
     if ($claimsService.Status -ne "Online") {
         try {
             Write-Verbose "Starting $($claimsService.DisplayName)..."
-            <#
-            SP-RegisterManagedAccount -username $spc2WTSAcctName -password $spc2WTSAcctPwd;
-            UpdateProcessIdentity $claimsService -svcName $spc2WTSAcctName;
-            $claimsService.Update()
-            # Add C2WTS account to local admins
-            AddAccountToAdmin -spAccountName $spc2WTSAcctName;
-            $claimsService.Provision()
+            $claimsService.Provision();
             if (-not $?) {throw " Failed to start $($claimsService.DisplayName)"}
-            #>
             SetC2WTSToLocalAccount;
         }
         catch {
@@ -304,7 +297,7 @@ function SP-CreateUserProfileServiceApplication {
         $profileServiceAppPermissions = Get-SPServiceApplicationSecurity $serviceAppIDToSecure;
         # Get account principals
         $currentUserAcctPrincipal = New-SPClaimsPrincipal -Identity $env:USERDOMAIN\$env:USERNAME -IdentityType WindowsSamAccountName
-        $spServiceAcctPrincipal = New-SPClaimsPrincipal -Identity $($spServiceAcctName) -IdentityType WindowsSamAccountName
+        $spServiceAcctPrincipal = New-SPClaimsPrincipal -Identity $($global:spServiceAcctName) -IdentityType WindowsSamAccountName
         $spAdminAcctPrincipal = New-SPClaimsPrincipal -Identity $($global:spAdminAcctName) -IdentityType WindowsSamAccountName
         Grant-SPObjectSecurity $profileServiceAppSecurity -Principal $currentUserAcctPrincipal -Rights "Full Control"
         Grant-SPObjectSecurity $profileServiceAppPermissions -Principal $currentUserAcctPrincipal -Rights "Full Control"
@@ -427,6 +420,7 @@ function CreateUPSAsAdmin {
 }
 
 function SP-CreateSPUsageApp {
+    Write-Host -ForegroundColor Green "Creating Usage Managed Service App";
     # Create the SharePoint Usage App.
     try {
         $spUsageDB = $global:dbPrefix + "_Service_UsageApp";
@@ -454,9 +448,11 @@ function SP-CreateSPUsageApp {
         Write-Output $_
         Throw "Error provisioning the SP Usage Application"
     }
+    Write-Host -ForegroundColor Green "Done Creating Usage Managed Service App";
 }
 
 function SP-CreateSecureStoreServiceApp {
+    Write-Host -ForegroundColor Green "Creating Secure Store Service";
     # Create a secure store app.
     try {        
         $secureStoreServiceAppProxyName = "$secureStoreServiceAppName Proxy";
@@ -497,52 +493,53 @@ function SP-CreateSecureStoreServiceApp {
             $secureStore = Get-SPServiceApplicationProxy | Where {$_.GetType().Equals([Microsoft.Office.SecureStoreService.Server.SecureStoreServiceApplicationProxy])}
             Start-Sleep 5
             Write-Verbose "Creating the Master Key..."
-            Update-SPSecureStoreMasterKey -ServiceApplicationProxy $secureStore.Id -Passphrase $passphrase
+            Update-SPSecureStoreMasterKey -ServiceApplicationProxy $secureStore.Id -Passphrase $global:passphrase
             Start-Sleep 5
             Write-Verbose "Creating the Application Key..."
-            Update-SPSecureStoreApplicationServerKey -ServiceApplicationProxy $secureStore.Id -Passphrase $passphrase -ErrorAction SilentlyContinue
+            Update-SPSecureStoreApplicationServerKey -ServiceApplicationProxy $secureStore.Id -Passphrase $global:passphrase -ErrorAction SilentlyContinue
             Start-Sleep 5
             if (!$?) {
                 # Try again...
                 Write-Verbose "Creating the Application Key (2nd attempt)..."
-                Update-SPSecureStoreApplicationServerKey -ServiceApplicationProxy $secureStore.Id -Passphrase $passphrase
+                Update-SPSecureStoreApplicationServerKey -ServiceApplicationProxy $secureStore.Id -Passphrase $global:passphrase
             }
         }
         else {
             Write-Verbose "Secure Store Service Application already provisioned."
         }
-    }
-    catch {
+    } catch {
         Write-Output $_
         Throw "Error provisioning secure store application"
     }
-    Write-Verbose "Done creating/configuring Secure Store Service Application."
+    Write-Verbose "Done creating/configuring Secure Store Service Application.";
+    Write-Host -ForegroundColor Green "Done Creating Secure Store Service";
 }
 
 function SP-ConfigureTracing {
+    Write-Host -ForegroundColor Green "Configuring Tracing";
     # Configure tracing.
     # Make sure a credential deployment job doesn't already exist
     if (!(Get-SPTimerJob -Identity "windows-service-credentials-SPTraceV4")) {
         $spTraceV4 = (Get-SPFarm).Services | where {$_.Name -eq "SPTraceV4"}
-        $appPoolAcctDomain, $appPoolAcctUser = $spServiceAcctName -Split "\\"
-        Write-Verbose "Applying service account $($spServiceAcctName) to service SPTraceV4..."
+        $appPoolAcctDomain, $appPoolAcctUser = $global:spServiceAcctName -Split "\\"
+        Write-Verbose "Applying service account $($global:spServiceAcctName) to service SPTraceV4..."
         # Add to Performance Monitor Users group
-        Write-Verbose "Adding $($spServiceAcctName) to local Performance Monitor Users group..."
+        Write-Verbose "Adding $($global:spServiceAcctName) to local Performance Monitor Users group..."
         try {
             ([ADSI]"WinNT://$env:COMPUTERNAME/Performance Monitor Users,group").Add("WinNT://$appPoolAcctDomain/$appPoolAcctUser")
             if (-not $?) {Throw}
         }
         catch {
-            Write-Verbose "$($spServiceAcctName) is already a member of Performance Monitor Users."
+            Write-Verbose "$($global:spServiceAcctName) is already a member of Performance Monitor Users."
         }
         # Add to Performance Log Users group
-        Write-Verbose "Adding $($spServiceAcctName) to local Performance Log Users group..."
+        Write-Verbose "Adding $($global:spServiceAcctName) to local Performance Log Users group..."
         try {
             ([ADSI]"WinNT://$env:COMPUTERNAME/Performance Log Users,group").Add("WinNT://$appPoolAcctDomain/$appPoolAcctUser")
             if (-not $?) {Throw}
         }
         catch {
-            Write-Verbose "$($spServiceAcctName) is already a member of Performance Log Users."
+            Write-Verbose "$($global:spServiceAcctName) is already a member of Performance Log Users."
         }
         try {
             UpdateProcessIdentity $spTraceV4
@@ -557,17 +554,19 @@ function SP-ConfigureTracing {
     }
     else {
         Write-Warning "Timer job `"windows-service-credentials-SPTraceV4`" already exists."
-        Write-Host -ForegroundColor Yellow "Check that $($spServiceAcctName) is a member of the Performance Log Users and Performance Monitor Users local groups once install completes."
+        Write-Host -ForegroundColor Yellow "Check that $($global:spServiceAcctName) is a member of the Performance Log Users and Performance Monitor Users local groups once install completes."
     }
+    Write-Host -ForegroundColor Green "Done Configuring Tracing";
 }
 
 function SP-CreateBusinessDataConnectivityServiceApp {
+    Write-Host -ForegroundColor Green "Creating BCS Service App.";
     # Create BCS service app
     try {
         $bdcDataDB = $global:dbPrefix + "_Service_BCS";
-        $bdcAppProxyName = "$bdcAppName Proxy";
-        Write-Verbose "Provisioning $bdcAppName"
-        $applicationPool = Get-HostedServicesAppPool $xmlinput
+        $bdcAppProxyName = "$global:bdcAppName Proxy";
+        Write-Verbose "Provisioning $global:bdcAppName"
+        $applicationPool = Get-HostedServicesAppPool;
         Write-Verbose "Checking local service instance..."
         # Get the service instance
         $bdcServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.BusinessData.SharedService.BdcServiceInstance"}
@@ -587,32 +586,36 @@ function SP-CreateBusinessDataConnectivityServiceApp {
                 $bdcServiceInstance = $bdcServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             }
             Write-Host -BackgroundColor Yellow -ForegroundColor Black ($bdcServiceInstance.Status)
-        }
-        else {
+        } else {
             Write-Verbose "$($bdcServiceInstance.TypeName) already started."
         }
         # Create a Business Data Catalog Service Application
         if ((Get-SPServiceApplication | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.BusinessData.SharedService.BdcServiceApplication"}) -eq $null) {
             # Create Service App
-            Write-Verbose "Creating $bdcAppName..."
-            $bdcDataServiceApp = New-SPBusinessDataCatalogServiceApplication -Name $bdcAppName -ApplicationPool $applicationPool -DatabaseServer $global:dbServer -DatabaseName $bdcDataDB
-            if (-not $?) { Throw "Failed to create $bdcAppName" }
+            Write-Verbose "Creating $global:bdcAppName..."
+            $bdcDataServiceApp = New-SPBusinessDataCatalogServiceApplication -Name $global:bdcAppName -ApplicationPool $applicationPool -DatabaseServer $global:dbServer -DatabaseName $bdcDataDB
+            if (-not $?) { Throw "Failed to create $global:bdcAppName" }
+        } else {
+            Write-Verbose "$global:bdcAppName already provisioned."
         }
-        else {
-            Write-Verbose "$bdcAppName already provisioned."
-        }
-        Write-Verbose "Done creating $bdcAppName."
-    }
-    catch {
+        Write-Verbose "Done creating $global:bdcAppName."
+    } catch {
         Write-Output $_
         Throw "Error provisioning Business Data Connectivity application"
     }
+    Write-Host -ForegroundColor Green "Done Creating BCS Service App.";
 }
 
 function SP-CreateExcelServiceApp {
+    Write-Host -ForegroundColor Green "Creating Excel Services App.";
+    $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
+    if ($spVer -ge 16) {
+        Write-Warning "Excel services not available from Sharepoint 2016";
+        return;
+    }
     # Create excel services.
     try {
-        Write-Verbose "Provisioning $excelAppName..."
+        Write-Verbose "Provisioning $global:excelAppName..."
         $applicationPool = Get-HostedServicesAppPool;
         Write-Verbose "Checking local service instance..."
         # Get the service instance
@@ -642,20 +645,20 @@ function SP-CreateExcelServiceApp {
         $excelServiceApp = Get-SPServiceApplication | ? {$_.GetType().ToString() -eq "Microsoft.Office.Excel.Server.MossHost.ExcelServerWebServiceApplication"}
         if ($excelServiceApp -eq $null) {
             # Create Service App
-            Write-Verbose "Creating $excelAppName..."
+            Write-Verbose "Creating $global:excelAppName..."
             # Check if our new cmdlets are available yet,  if not, re-load the SharePoint PS Snapin
             if (!(Get-Command New-SPExcelServiceApplication -ErrorAction SilentlyContinue)) {
                 Write-Verbose "Re-importing SP PowerShell Snapin to enable new cmdlets..."
                 Remove-PSSnapin Microsoft.SharePoint.PowerShell
                 Load-SharePoint-PowerShell
             }
-            $excelServiceApp = New-SPExcelServiceApplication -name $excelAppName -ApplicationPool $($applicationPool.Name) -Default
-            if (-not $?) { Throw "Failed to create $excelAppName" }
+            $excelServiceApp = New-SPExcelServiceApplication -name $global:excelAppName -ApplicationPool $($applicationPool.Name) -Default
+            if (-not $?) { Throw "Failed to create $global:excelAppName" }
             $caUrl = (Get-Item -Path "HKLM:\SOFTWARE\Microsoft\Shared Tools\Web Server Extensions\$spVer.0\WSS").GetValue("CentralAdministrationURL")
-            New-SPExcelFileLocation -LocationType SharePoint -IncludeChildren -Address $caUrl -ExcelServiceApplication $excelAppName -ExternalDataAllowed 2 -WorkbookSizeMax 10 | Out-Null
+            New-SPExcelFileLocation -LocationType SharePoint -IncludeChildren -Address $caUrl -ExcelServiceApplication $global:excelAppName -ExternalDataAllowed 2 -WorkbookSizeMax 10 | Out-Null
         }
         else {
-            Write-Verbose "$excelAppName already provisioned."
+            Write-Verbose "$global:excelAppName already provisioned."
         }
         Write-Verbose "Configuring service app settings..."
         # Configure unattended accounts, based on:
@@ -664,7 +667,7 @@ function SP-CreateExcelServiceApp {
         # Reget application to prevent update conflict error message
         $excelServiceApp = Get-SPExcelServiceApplication
         # Get account credentials
-        $excelAcct = $spServiceAcctName;
+        $excelAcct = $global:spServiceAcctName;
         $excelAcctPWD = $spServiceAcctPWD;
         $secPassword = ConvertTo-SecureString "$excelAcctPWD" -AsPlaintext -Force
         $unattendedAccount = New-Object System.Management.Automation.PsCredential $excelAcct,$secPassword
@@ -705,34 +708,37 @@ function SP-CreateExcelServiceApp {
         Update-SPSecureStoreGroupCredentialMapping -Identity $secureStoreApp -Values $credentialValues
         # Set the unattended service account application ID
         Set-SPExcelServiceApplication -Identity $excelServiceApp -UnattendedAccountApplicationId $name
-        Write-Verbose "Done creating $excelAppName."
-    }
-    catch {
+        Write-Verbose "Done creating $global:excelAppName."
+    } catch {
         Write-Output $_
         Throw "Error provisioning Excel Service Application"
     }
+    Write-Host -ForegroundColor Green "Done Creating Excel Services App.";
 }
 
 function SP-CreateAccess2010ServiceApp {
+    Write-Host -ForegroundColor Green "Creating Access 2010 Services App.";
     # Create support for legacy Access Services
     $serviceInstanceType = "Microsoft.Office.Access.Server.MossHost.AccessServerWebServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $access2010AppName `
+        -ServiceName $global:access2010AppName `
         -ServiceDBName ($global:dbPrefix + "_Service_Access2010") `
         -ServiceGetCmdlet "Get-SPAccessServiceApplication" `
         -ServiceProxyGetCmdlet "Get-SPServiceApplicationProxy" `
         -ServiceNewCmdlet "New-SPAccessServiceApplication -Default" `
         -ServiceProxyNewCmdlet "New-SPAccessServiceApplicationProxy" 
         # Fake cmdlet (and not needed for Access Services), but the CreateGenericServiceApplication function expects something
+    Write-Host -ForegroundColor Green "Done Creating Access 2010 Services App.";
 }
 
 function SP-CreateVisioServiceApp {
+    Write-Host -ForegroundColor Green "Creating Visio Services App";
     # Create Visio Services App
     $serviceInstanceType = "Microsoft.Office.Visio.Server.Administration.VisioGraphicsServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $visioAppName `
+        -ServiceName $global:visioAppName `
         -ServiceDBName ($global:dbPrefix + "_Service_Visio") `
         -ServiceGetCmdlet "Get-SPVisioServiceApplication" `
         -ServiceProxyGetCmdlet "Get-SPVisioServiceApplicationProxy" `
@@ -742,9 +748,9 @@ function SP-CreateVisioServiceApp {
     if (Get-Command -Name Get-SPVisioServiceApplication -ErrorAction SilentlyContinue) {
         # http://blog.falchionconsulting.com/index.php/2010/10/service-accounts-and-managed-service-accounts-in-sharepoint-2010/
         Write-Verbose "Setting unattended account credentials..."
-        $serviceApplication = Get-SPServiceApplication -name $visioAppName
+        $serviceApplication = Get-SPServiceApplication -name $global:visioAppName
         # Get account credentials
-        $visioAcct = $spServiceAcctName;
+        $visioAcct = $global:spServiceAcctName;
         $visioAcctPWD = $spServiceAcctPwd;
         $secPassword = ConvertTo-SecureString "$visioAcctPWD" -AsPlaintext -Force
         $unattendedAccount = New-Object System.Management.Automation.PsCredential $visioAcct,$secPassword
@@ -787,15 +793,17 @@ function SP-CreateVisioServiceApp {
         Write-Verbose "Setting Application ID for Visio Service..."
         $serviceApplication | Set-SPVisioExternalData -UnattendedServiceAccountApplicationID $name
     }
+    Write-Host -ForegroundColor Green "Done Creating Visio Services App";
 }
 
 function SP-CreatePerformancePointServiceApp {
+    Write-Host -ForegroundColor Green "Creating PerformancePoint Services App";
     # Create PerformancePoint App.
     $serviceDB = ($global:dbPrefix + "_Service_PerformancePoint");
     $serviceInstanceType = "Microsoft.PerformancePoint.Scorecards.BIMonitoringServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $perfPointAppName `
+        -ServiceName $global:perfPointAppName `
         -ServiceDBName $serviceDB `
         -ServiceGetCmdlet "Get-SPPerformancePointServiceApplication" `
         -ServiceProxyGetCmdlet "Get-SPServiceApplicationProxy" `
@@ -808,21 +816,23 @@ function SP-CreatePerformancePointServiceApp {
         Write-Verbose "Granting $farmAcct rights to database $serviceDB..."
         Get-SPDatabase | Where {$_.Name -eq $serviceDB} | Add-SPShellAdmin -UserName $farmAcct
         Write-Verbose "Setting PerformancePoint Data Source Unattended Service Account..."
-        $performancePointAcct = $spServiceAcctName;
+        $performancePointAcct = $global:spServiceAcctName;
         $performancePointAcctPWD = $spServiceAcctPwd;
         $secPassword = ConvertTo-SecureString "$performancePointAcctPWD" -AsPlaintext -Force
         $performancePointCredential = New-Object System.Management.Automation.PsCredential $performancePointAcct,$secPassword
         $application | Set-SPPerformancePointSecureDataValues -DataSourceUnattendedServiceAccount $performancePointCredential
     }
+    Write-Host -ForegroundColor Green "Done Creating PerformancePoint Services App";
 }
 
 function SP-CreateWordAutomationServiceApp {
+    Write-Host -ForegroundColor Green "Creating Word Automation Services App";
     # Create Word Automation Service App.
     $serviceDB = ($global:dbPrefix + "_Service_WordAutomation");
     $serviceInstanceType = "Microsoft.Office.Word.Server.Service.WordServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $wordAutoAppName `
+        -ServiceName $global:wordAutoAppName `
         -ServiceDBName $serviceDB `
         -ServiceGetCmdlet "Get-SPServiceApplication" `
         -ServiceProxyGetCmdlet "Get-SPServiceApplicationProxy" `
@@ -833,6 +843,7 @@ function SP-CreateWordAutomationServiceApp {
     if (Get-SPServiceApplication | ? {$_.DisplayName -eq $($serviceConfig.Name)}) {
         Get-SPTimerJob | ? {$_.GetType().ToString() -eq "Microsoft.Office.Word.Server.Service.QueueJob"} | ForEach-Object {$_.RunNow()}
     }
+    Write-Host -ForegroundColor Green "Done Creating Word Automation Services App";
 }
 
 function CreateGenericServiceApplication() {
@@ -941,102 +952,114 @@ function CreateGenericServiceApplication() {
 }
 
 function SP-CreateAppManagementServiceApp {
+    Write-Host -ForegroundColor Green "Creating App Management Service";
     # Create the app management service app.
     $serviceDB = $global:dbPrefix + "_Service_AppManagement";
     $serviceInstanceType = "Microsoft.SharePoint.AppManagement.AppManagementServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $appMgmtName `
+        -ServiceName $global:appMgmtName `
         -ServiceDBName = $serviceDB `
         -ServiceGetCmdlet "Get-SPServiceApplication" `
         -ServiceProxyGetCmdlet "Get-SPServiceApplicationProxy" `
 		-ServiceNewCmdlet "New-SPAppManagementServiceApplication -DatabaseServer $global:dbServer -DatabaseName $serviceDB" `
         -ServiceProxyNewCmdlet "New-SPAppManagementServiceApplicationProxy"
-		# Configure your app domain and location
-		Write-Verbose "Setting App Domain `"$($appDomain)`"..."
-	    Set-SPAppDomain -AppDomain $appDomain
+	# Configure your app domain and location
+	Write-Verbose "Setting App Domain `"$($appDomain)`"..."
+	Set-SPAppDomain -AppDomain $global:appDomain;
+    Write-Host -ForegroundColor Green "Done Creating App Management Service";
 }
 
 function SP-CreateSubscriptionSettingsServiceApp {
+    Write-Host -ForegroundColor Green "Creating App Subscription Service";
     # Create the subscription service app.
     $serviceDB = $global:dbPrefix + "_Service_AppSubscription";
     $serviceInstanceType = "Microsoft.SharePoint.SPSubscriptionSettingsServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $appSubsName `
+        -ServiceName $global:appSubsName `
         -ServiceDBName $serviceDB `
         -ServiceGetCmdlet "Get-SPServiceApplication" `
         -ServiceProxyGetCmdlet "Get-SPServiceApplicationProxy" `
 		-ServiceNewCmdlet "New-SPSubscriptionSettingsServiceApplication -DatabaseServer $global:dbServer -DatabaseName $serviceDB" `
         -ServiceProxyNewCmdlet "New-SPSubscriptionSettingsServiceApplicationProxy"
-		Write-Verbose "Setting Site Subscription name `"$($appSubscriptionName)`"..."
-        # Wait for the service to be available.
-        Start-Sleep 20;
-	    Set-SPAppSiteSubscriptionName -Name $appSubscriptionName -Confirm:$false
+		Write-Verbose "Setting Site Subscription name `"$($global:appSubscriptionName)`"..."
+    # Wait for the service to be available.
+    Start-Sleep 20;
+	Set-SPAppSiteSubscriptionName -Name $global:appSubscriptionName -Confirm:$false
+    Write-Host -ForegroundColor Green "Done Creating App Subscription Service";
 }
 
 function SP-CreateWorkManagementServiceApp {
+    Write-Host -ForegroundColor Green "Creating Workflow Management Service";
     # Create the work management service app.
     $serviceInstanceType = "Microsoft.Office.Server.WorkManagement.WorkManagementServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $workMgmtName `
+        -ServiceName $global:workMgmtName `
         -ServiceDBName ($global:dbPrefix + "_Service_WorkManagement") `
         -ServiceGetCmdlet "Get-SPServiceApplication" `
         -ServiceProxyGetCmdlet "Get-SPServiceApplicationProxy" `
         -ServiceNewCmdlet "New-SPWorkManagementServiceApplication" `
-        -ServiceProxyNewCmdlet "New-SPWorkManagementServiceApplicationProxy"
+        -ServiceProxyNewCmdlet "New-SPWorkManagementServiceApplicationProxy";
+    Write-Host -ForegroundColor Green "Done Creating Workflow Management Service";
 }
 
 function SP-CreateMachineTranslationServiceApp {
+    Write-Host -ForegroundColor Green "Creating Machine Translation Service";
     # Create the translation service app.
     $translationDatabase = $global:dbPrefix + "_Service_TranslationSvc";
     $serviceInstanceType = "Microsoft.Office.TranslationServices.TranslationServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $transSvcName `
+        -ServiceName $global:transSvcName `
         -ServiceDBName $translationDatabase `
         -ServiceGetCmdlet "Get-SPServiceApplication" `
         -ServiceProxyGetCmdlet "Get-SPServiceApplicationProxy" `
         -ServiceNewCmdlet "New-SPTranslationServiceApplication -DatabaseServer $global:dbServer -DatabaseName $translationDatabase -Default" `
-        -ServiceProxyNewCmdlet "New-SPTranslationServiceApplicationProxy"
+        -ServiceProxyNewCmdlet "New-SPTranslationServiceApplicationProxy";
+    Write-Host -ForegroundColor Green "Done Creating Machine Translation Service";
 }
 
 function SP-CreateAccessServicesApp {
+    Write-Host -ForegroundColor Green "Creating Access Service";
     # Create the Access Services App - Require Full Text Indexing on DB server.
     $serviceInstanceType = "Microsoft.Office.Access.Services.MossHost.AccessServicesWebServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $accessAppName `
+        -ServiceName $global:accessAppName `
         -ServiceDBName ($global:dbPrefix + "_Service_AccessServices") `
         -ServiceGetCmdlet "Get-SPAccessServicesApplication" `
         -ServiceProxyGetCmdlet "Get-SPServicesApplicationProxy" `
         -ServiceNewCmdlet "New-SPAccessServicesApplication -DatabaseServer $global:dbServer -Default" `
-        -ServiceProxyNewCmdlet "New-SPAccessServicesApplicationProxy"
+        -ServiceProxyNewCmdlet "New-SPAccessServicesApplicationProxy";
+    Write-Host -ForegroundColor Green "Done Creating Access Service";
 }
 
 function SP-CreatePowerPointConversionServiceApp {
+    Write-Host -ForegroundColor Green "Creating PowerPoint Conversion Service";
     # Create the PowerPoint conversion service.
     $serviceInstanceType = "Microsoft.Office.Server.PowerPoint.Administration.PowerPointConversionServiceInstance"
     CreateGenericServiceApplication `
         -ServiceInstanceType $serviceInstanceType `
-        -ServiceName $pwrpntConvApp `
+        -ServiceName $global:pwrpntConvApp `
         -serviceDBName ($global:dbPrefix + "_Service_PowerPointConversion") `
         -ServiceGetCmdlet "Get-SPServiceApplication" `
         -ServiceProxyGetCmdlet "Get-SPServiceApplicationProxy" `
         -ServiceNewCmdlet "New-SPPowerPointConversionServiceApplication" `
-        -ServiceProxyNewCmdlet "New-SPPowerPointConversionServiceApplicationProxy"
+        -ServiceProxyNewCmdlet "New-SPPowerPointConversionServiceApplicationProxy";
+    Write-Host -ForegroundColor Green "Done Creating PowerPoint Conversion Service";
 }
 
 function SP-ConfigureDistributedCacheService {
     # Configure the distributed cache.
-    # Make sure a credential deployment job doesn't already exist, and that we are running SP2013
+    # Make sure a credential deployment job doesn't already exist
     if ((!(Get-SPTimerJob -Identity "windows-service-credentials-AppFabricCachingService"))) {
         $distributedCachingSvc = (Get-SPFarm).Services | where {$_.Name -eq "AppFabricCachingService"}
-        $appPoolAcctDomain, $appPoolAcctUser = $spServiceAcctName -Split "\\"
-        Write-Verbose "Applying service account $($spServiceAcctName) to service AppFabricCachingService..."
+        $appPoolAcctDomain, $appPoolAcctUser = $global:spServiceAcctName -Split "\\"
+        Write-Verbose "Applying service account $($global:spServiceAcctName) to service AppFabricCachingService..."
         try {
-            UpdateProcessIdentity $distributedCachingSvc $spServiceAcctName
+            UpdateProcessIdentity $distributedCachingSvc $global:spServiceAcctName
         }
         catch {
             Write-Output $_

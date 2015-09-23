@@ -3,6 +3,7 @@
 # Rob Garrett
 # With the help from http://autospinstaller.codeplex.com/
 
+[CmdletBinding()]
 param ([bool]$localExec = $true)
 
 $0 = $myInvocation.MyCommand.Definition
@@ -24,7 +25,7 @@ try {
     # Configure PWA
     SP-ConfigureBaseProjectServer;
     # Post Configuration
-    #SP-PostInstallation;
+    SP-PostInstallation;
 }
 catch {
     Write-Host -ForegroundColor Red "Critial Error: " $_.Exception.Message;
