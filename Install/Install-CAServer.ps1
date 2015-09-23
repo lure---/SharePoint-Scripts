@@ -26,20 +26,18 @@ try {
     # Create CA web site
     SP-CreateCentralAdmin;
     # Configure C2WTS.
-    #SP-ConfigureClaimsToWindowsTokenService;
+    SP-ConfigureClaimsToWindowsTokenService;
     # Configure ULS
-    #SP-ConfigureDiagnosticLogging;
+    SP-ConfigureDiagnosticLogging;
     # Install Language Packs
-    #SP-ConfigureLanguagePacks;
+    SP-ConfigureLanguagePacks;
     # Configure email.
-    #SP-ConfigureEmail;
+    SP-ConfigureEmail;
     # Post Configuration
-    #SP-PostInstallation;
+    SP-PostInstallation;
 }
 catch {
     Write-Host -ForegroundColor Red "Critial Error: " $_.Exception.Message;
 }
-
-Pause;
 
 

@@ -4,12 +4,10 @@
 # With the help from http://autospinstaller.codeplex.com/
 
 function SP-ExecCommonSPServerProvisioning {
-    # Create SQL Alias
-    #SQL-CreateAlias
     # Register SharePoint PowerShell Cmdlets
     SP-RegisterPS;
     # Disable loopback check.
-    #SP-DisableLoopback;
+    SP-DisableLoopback;
     # Create Farm
     #SP-CreateOrJoinFarm;
     # Configure new or existing farm
@@ -18,7 +16,7 @@ function SP-ExecCommonSPServerProvisioning {
 
 function SP-GetFarmCredential {
     # Prompt for the farm account credentials.
-    Write-Host -BackgroundColor Gray -ForegroundColor DarkBlue " - Prompting for Farm Account:"
+    Write-Host -BackgroundColor Gray -ForegroundColor DarkBlue "Prompting for Farm Account:"
     return $host.ui.PromptForCredential("Farm Setup", "Enter Farm Account Credentials:", "$spFarmAcctName", "NetBiosUserName" )
 }
 
@@ -35,7 +33,7 @@ function SP-DisableLoopback {
 
 function SP-CreateOrJoinFarm {
     # Look for an existing farm and join the farm if not already joined, or create a new farm
-    Write-Host -ForegroundColor White "Creating or Joining Server Farm";
+    Write-Host -Foregroundcolor Green "Creating or Joining Server Farm";
     try {
         $configDB = $global:dbPrefix + "_Config_Farm";
         Write-Verbose "Checking farm membership for $env:COMPUTERNAME in `"$configDB`"..."
@@ -76,7 +74,7 @@ function SP-CreateOrJoinFarm {
         $farmMessage = "$env:COMPUTERNAME is already joined to farm on `"$configDB`"."
     }
     Write-Verbose $farmMessage;
-    Write-Host -ForegroundColor White "Done Creating or Joining Server Farm";
+    Write-Host -Foregroundcolor Green "Done Creating or Joining Server Farm";
 }
 
 function SP-CheckIfUpgradeNeeded {
@@ -92,7 +90,7 @@ function SP-CheckIfUpgradeNeeded {
 }
 
 function SP-ConfigureFarm {
-    Write-Host -ForegroundColor White "Configuring the SharePoint farm/server..."
+    Write-Host -Foregroundcolor Green "Configuring the SharePoint farm/server..."
     # Check if farm has more than one server, other than DB server
     $configDB = $global:dbPrefix + "_Config_Farm";
     $spFarm = Get-SPFarm | Where-Object {$_.Name -eq $configDB}
@@ -143,13 +141,13 @@ function SP-ConfigureFarm {
     } else {
         throw "Not connected to the farm";
     }
-    Write-Host -ForegroundColor White "Done configuring the SharePoint farm/server."
+    Write-Host -Foregroundcolor Green "Done configuring the SharePoint farm/server."
 }
 
 function SP-ChangeCacheServiceAccount {
     # Change the Distributed Cache Service to us the service account
     # Not the farm account.
-    Write-Host -ForegroundColor White "Changing cache service account to $global:spServiceAcctName."
+    Write-Host -Foregroundcolor Green "Changing cache service account to $global:spServiceAcctName."
     $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
     if ($spVer -ge 15) {
         $configDB = $global:dbPrefix + "_Config_Farm";
@@ -163,11 +161,11 @@ function SP-ChangeCacheServiceAccount {
             $cacheService.ProcessIdentity.Update();
         }
     }
-    Write-Host -ForegroundColor White "Done changing cache service account to $global:spServiceAcctName."
+    Write-Host -Foregroundcolor Green "Done changing cache service account to $global:spServiceAcctName."
 }
 
 function SP-ConfigFarmAfterUpgrade {
-    Write-Host -ForegroundColor White "Performing post farm config tasks"
+    Write-Host -Foregroundcolor Green "Performing post farm config tasks"
     # Configure the farm after an upgrade.
     # Use PSConfig to ensure that we're upgraded.
     if (SP-CheckIfUpgradeNeeded -eq $true) {
@@ -193,8 +191,8 @@ function SP-ConfigFarmAfterUpgrade {
     $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
     $spRegVersion = (Get-Item -Path "HKLM:\SOFTWARE\Microsoft\Shared Tools\Web Server Extensions\$spVer.0\").GetValue("Version")
     if (!($spRegVersion)) {
-        Write-Verbose " - Creating Version registry value (workaround for bug in PS-based install)"
-        Write-Verbose " - Getting version number... "
+        Write-Verbose "Creating Version registry value (workaround for bug in PS-based install)"
+        Write-Verbose "Getting version number... "
         $spBuild = "$($(Get-SPFarm).BuildVersion.Major).0.0.$($(Get-SPFarm).BuildVersion.Build)"
         Write-Verbose "$spBuild"
         New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Shared Tools\Web Server Extensions\$spVer.0\" `
@@ -207,15 +205,15 @@ function SP-ConfigFarmAfterUpgrade {
     if ((Get-Service SPTimerV4).Status -eq "Stopped") {
         Write-Verbose "Starting $((Get-Service SPTimerV4).DisplayName) Service..."
         Start-Service SPTimerV4
-        if (!$?) {Throw " - Could not start Timer service!"}
+        if (!$?) {Throw "Could not start Timer service!"}
     } else {
         Write-Verbose "$((Get-Service SPTimerV4).DisplayName) Service already started.";
     }
-    Write-Host -ForegroundColor White "Performing post farm config tasks"
+    Write-Host -Foregroundcolor Green "Performing post farm config tasks"
 }
 
 function SP-CreateCentralAdmin {
-    Write-Host -ForegroundColor White "Creating CA site."
+    Write-Host -Foregroundcolor Green "Creating CA site."
     # Create CA if it doesn't already exist.
     # Get all Central Admin service instances in the farm
     $centralAdminServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq `
@@ -233,7 +231,7 @@ function SP-CreateCentralAdmin {
                 Write-Verbose "Creating Central Admin site..."
                 $newCentralAdmin = New-SPCentralAdministration -Port $global:CAportNumber -WindowsAuthProvider "NTLM" -ErrorVariable err
                 if (-not $?) {Throw "Error creating central administration application"}
-                Write-Host -ForegroundColor yellow " - Waiting for Central Admin site..." -NoNewline
+                Write-Host -ForegroundColor yellow "Waiting for Central Admin site..." -NoNewline
                 while ($localCentralAdminService.Status -ne "Online") {
                     Write-Host -ForegroundColor yellow "." -NoNewline
                     Start-Sleep 1
@@ -259,7 +257,7 @@ function SP-CreateCentralAdmin {
             }
         }
     }
-    Write-Host -ForegroundColor White "Done creating CA site."
+    Write-Host -Foregroundcolor Green "Done creating CA site."
 }
 
 function Run-PSConfig {
@@ -276,7 +274,7 @@ function Check-PSConfig {
     $PSConfigLog = Get-ChildItem -Path $PSConfigLogLocation | ? {$_.Name -like "PSCDiagnostics*"} | `
         Sort-Object -Descending -Property "LastWriteTime" | Select-Object -first 1
     if ($PSConfigLog -eq $null) {
-        Throw " - Could not find PSConfig log file!"
+        Throw "Could not find PSConfig log file!"
     }
     else {
         # Get error(s) from log
@@ -287,42 +285,46 @@ function Check-PSConfig {
 
 function SP-ConfigureDiagnosticLogging {
     # Configure logging.
-    Write-Host -ForegroundColor White " - Configuring SharePoint diagnostic (ULS) logging..."
-    Write-Host -ForegroundColor White " - Setting SharePoint diagnostic (ULS) logging options:"
-    Write-Host -ForegroundColor White "  - DaysToKeepLogs: $logDaysToKeepLogs"
-    Write-Host -ForegroundColor White "  - LogDiskSpaceUsageGB: $logSpaceUsage"
-    Write-Host -ForegroundColor White "  - LogLocation: $logLocation"
-    Write-Host -ForegroundColor White "  - LogCutInterval: $logCutInterval"
-    Set-SPDiagnosticConfig -DaysToKeepLogs $logDaysToKeepLogs -LogMaxDiskSpaceUsageEnabled:$true `
-        -LogDiskSpaceUsageGB $logSpaceUsage -LogLocation $logLocation -LogCutInterval $logCutInterval
+    Write-Host -Foregroundcolor Green "Configuring logging";
+    Write-Verbose "Configuring SharePoint diagnostic (ULS) logging..."
+    Write-Verbose "Setting SharePoint diagnostic (ULS) logging options:"
+    Write-Verbose "  - DaysToKeepLogs: $global:logDaysToKeepLogs"
+    Write-Verbose "  - LogDiskSpaceUsageGB: $global:logSpaceUsage"
+    Write-Verbose "  - LogLocation: $global:logLocation"
+    Write-Verbose "  - LogCutInterval: $global:logCutInterval"
+    Set-SPDiagnosticConfig -DaysToKeepLogs $global:logDaysToKeepLogs -LogMaxDiskSpaceUsageEnabled:$true `
+        -LogDiskSpaceUsageGB $global:logSpaceUsage -LogLocation $global:logLocation -LogCutInterval $global:logCutInterval
     # Finally, enable NTFS compression on the ULS log location to save disk space
     # Replace \ with \\ for WMI
     $wmiPath = $logLocation.Replace("\","\\")
     $wmiDirectory = Get-WmiObject -Class "Win32_Directory" -Namespace "root\cimv2" -ComputerName $env:COMPUTERNAME -Filter "Name='$wmiPath'"
     # Check if folder is already compressed
     if (!($wmiDirectory.Compressed)) {
-        Write-Host -ForegroundColor White " - Compressing $logLocation and subfolders..."
+        Write-Verbose "Compressing $global:logLocation and subfolders..."
         $compress = $wmiDirectory.CompressEx("","True")
     }
     else {
-        Write-Host -ForegroundColor White " - $folder is already compressed."
+        Write-Verbose "$folder is already compressed."
     }
-    ApplyLogFolderPermissions -path $logLocation;
+    ApplyLogFolderPermissions -path $global:logLocation;
     $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
     $where = ([String]"$env:CommonProgramFiles\microsoft shared\Web Server Extensions\$spVer\LOGS").ToLower();
-    if (!$logLocation.ToLower().StartsWith($where)) {
+    if (!$global:logLocation.ToLower().StartsWith($where)) {
         ApplyLogFolderPermissions -path $where;
     }
+    Set-SPLogLevel -TraceSeverity High -EventSeverity Warning;
+    Write-Host -Foregroundcolor Green "Done configuring logging";
 }
 
 function SP-ConfigureLanguagePacks {
     # Configure language packs.
+    Write-Host -Foregroundcolor Green "Configuring language packs";
     $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
     $installedOfficeServerLanguages = (Get-Item "HKLM:\Software\Microsoft\Office Server\$spVer.0\InstalledLanguages").GetValueNames() | ? {$_ -ne ""}
     $languagePackInstalled = (Get-Item -Path "HKLM:\SOFTWARE\Microsoft\Shared Tools\Web Server Extensions\$spVer.0\WSS\").GetValue("LanguagePackInstalled")
     # If there were language packs installed we need to run psconfig to configure them
     if (($languagePackInstalled -eq "1") -and ($installedOfficeServerLanguages.Count -gt 1)) {
-        Write-Host -ForegroundColor White " - Configuring language packs..."
+        Write-Verbose "Configuring language packs..."
         # Let's sleep for a while to let the farm config catch up...
         Start-Sleep 20
         $retryNum += 1
@@ -332,20 +334,21 @@ function SP-ConfigureLanguagePacks {
         $PSConfigLastError = Check-PSConfig
         while (!([string]::IsNullOrEmpty($PSConfigLastError)) -and $retryNum -le 4) {
             Write-Warning $PSConfigLastError.Line
-            Write-Host -ForegroundColor White " - An error occurred running PSConfig, trying again ($retryNum)..."
+            Write-Verbose "An error occurred running PSConfig, trying again ($retryNum)..."
             Start-Sleep -Seconds 5
             $retryNum += 1
             Run-PSConfig
             $PSConfigLastError = Check-PSConfig
         }
         if ($retryNum -ge 5) {
-            Write-Host -ForegroundColor White " - After $retryNum retries to run PSConfig, trying GUI-based..."
+            Write-Verbose "After $retryNum retries to run PSConfig, trying GUI-based..."
             Start-Process -FilePath $PSConfigUI -NoNewWindow -Wait
         }
         Clear-Variable -Name PSConfigLastError -ErrorAction SilentlyContinue
         Clear-Variable -Name PSConfigLog -ErrorAction SilentlyContinue
         Clear-Variable -Name retryNum -ErrorAction SilentlyContinue
     }
+    Write-Host -Foregroundcolor Green "Done configuring language packs";
 }
 
 function SP-RegisterManagedAccount($username, $password) {
@@ -357,8 +360,8 @@ function SP-RegisterManagedAccount($username, $password) {
     try {
         $credAccount = New-Object System.Management.Automation.PsCredential $username,$password
         $managedAccountDomain,$managedAccountUser = $username -Split "\\"
-        Write-Host -ForegroundColor White "  - Account `"$managedAccountDomain\$managedAccountUser`:"
-        Write-Host -ForegroundColor White "   - Creating local profile for $username..."
+        Write-Verbose "Account `"$managedAccountDomain\$managedAccountUser`:"
+        Write-Verbose "Creating local profile for $username..."
         # Add managed account to local admins (very) temporarily so it can log in and create its profile
         if (!($localAdmins -contains $managedAccountUser)) {
             $builtinAdminGroup = Get-AdministratorsGroup
@@ -382,13 +385,12 @@ function SP-RegisterManagedAccount($username, $password) {
     }
     catch {
         $_
-        Write-Host -ForegroundColor White "."
         Write-Warning "Could not create local user profile for $username"
-        break
+        break;
     }
     $managedAccount = Get-SPManagedAccount | Where-Object {$_.UserName -eq $username}
     if ($managedAccount -eq $null) {
-        Write-Host -ForegroundColor White "   - Registering managed account $username..."
+        Write-Verbose "Registering managed account $username..."
         if ($username -eq $null -or $password -eq $null) {
             Write-Host -BackgroundColor Gray -ForegroundColor DarkBlue "   - Prompting for Account: "
             $credAccount = $host.ui.PromptForCredential("Managed Account", "Enter Account Credentials:", "", "NetBiosUserName" )
@@ -397,16 +399,16 @@ function SP-RegisterManagedAccount($username, $password) {
             $credAccount = New-Object System.Management.Automation.PsCredential $username,$password
         }
         New-SPManagedAccount -Credential $credAccount | Out-Null
-        if (-not $?) { Throw "   - Failed to create managed account" }
+        if (-not $?) { Throw "Failed to create managed account" }
     }
     else {
-        Write-Host -ForegroundColor White "   - Managed account $username already exists."
+        Write-Verbose "Managed account $username already exists."
     }
 }
 
 function SP-CreateManagedAccounts {
     # Create managed accounts.
-    Write-Host -ForegroundColor White "Adding Managed Accounts."
+    Write-Host -Foregroundcolor Green "Adding Managed Accounts."
     # Get the members of the local Administrators group
     $builtinAdminGroup = Get-AdministratorsGroup
     $adminGroup = ([ADSI]"WinNT://$env:COMPUTERNAME/$builtinAdminGroup,group")
@@ -422,7 +424,7 @@ function SP-CreateManagedAccounts {
     SP-RegisterManagedAccount -username $global:spAppPoolAcctName -password $global:spAppPoolAcctPwd
     SP-RegisterManagedAccount -username $global:spServiceAcctName -password $global:spServiceAcctPwd
     SP-RegisterManagedAccount -username $global:spc2WTSAcctName -password $global:spc2WTSAcctPwd
-    Write-Host -ForegroundColor White "Done adding Managed Accounts."
+    Write-Host -Foregroundcolor Green "Done adding Managed Accounts."
 }
 
 function SP-CreateWebApp($appPool, $webAppName, $database, $url, $port, $hostheader = $null) {
@@ -440,8 +442,8 @@ function SP-CreateWebApp($appPool, $webAppName, $database, $url, $port, $hosthea
     # If we are running Win2008 (non-R2), we may need the claims hotfix
     if ((Gwmi Win32_OperatingSystem).Version -like "6.0*") { 
         [bool]$claimsHotfixRequired = $true
-        Write-Host -ForegroundColor Yellow " - Web Applications using Claims authentication require an update"
-        Write-Host -ForegroundColor Yellow " - Apply the http://go.microsoft.com/fwlink/?LinkID=184705 update after setup."
+        Write-Host -ForegroundColor Yellow "Web Applications using Claims authentication require an update"
+        Write-Host -ForegroundColor Yellow "Apply the http://go.microsoft.com/fwlink/?LinkID=184705 update after setup."
     }
     if ($appPoolExists) {
         $appPoolAccountSwitch = @{}
@@ -452,25 +454,25 @@ function SP-CreateWebApp($appPool, $webAppName, $database, $url, $port, $hosthea
     # See if the we have the app already
     $getSPWebApplication = Get-SPWebApplication | Where-Object {$_.DisplayName -eq $webAppName}
     if ($getSPWebApplication -eq $null) {
-        Write-Host -ForegroundColor White " - Creating Web App `"$webAppName`""
+        Write-Verbose "Creating Web App `"$webAppName`""
         $hostHeaderSwitch = @{}
         $pathSwitch = @{}
         if ($hostheader -ne $null) { $hostHeaderSwitch = @{HostHeader = $hostHeader}; }
         New-SPWebApplication -Name $webAppName -ApplicationPool $appPool -DatabaseServer $global:dbServer -DatabaseName $database `
             -Url $url -Port $port -SecureSocketsLayer:$useSSL @hostHeaderSwitch @appPoolAccountSwitch @authProviderSwitch @pathSwitch | Out-Null
-        if (-not $?) { Throw " - Failed to create web application" }
+        if (-not $?) { Throw "Failed to create web application" }
     }
     else {
-        Write-Host -ForegroundColor White " - Web app `"$webAppName`" already provisioned."
+        Write-Verbose "Web app `"$webAppName`" already provisioned."
     }
 }
 
 function SP-CreateSiteCollection($appPool, $database, $siteCollectionName, $siteURL, $template = $null) {
     # Get the web app
     $webApp = Get-SPWebApplication | Where-Object { ($_.ApplicationPool).Name -eq $appPool }
-    if ($webApp -eq $null) { throw " - Failed to get web application"; }
+    if ($webApp -eq $null) { throw "Failed to get web application"; }
     # See if we have the site collection already.
-    Write-Host -ForegroundColor White " - Checking for Site Collection `"$siteURL`"..."
+    Write-Verbose "Checking for Site Collection `"$siteURL`"..."
     $getSPSiteCollection = Get-SPSite -Limit ALL | Where-Object {$_.Url -eq $siteURL}
     if (($getSPSiteCollection -eq $null)) {
         # Verify that the Language we're trying to create the site in is currently installed on the server
@@ -484,10 +486,10 @@ function SP-CreateSiteCollection($appPool, $database, $siteCollectionName, $site
         else {
             $siteDatabaseExists = Get-SPContentDatabase -Identity $database -ErrorAction SilentlyContinue
             if (!$siteDatabaseExists) {
-                Write-Host -ForegroundColor White " - Creating new content database `"$database`"..."
+                Write-Verbose "Creating new content database `"$database`"..."
                 New-SPContentDatabase -Name $database -WebApplication $webApp | Out-Null
             }
-            Write-Host -ForegroundColor White " - Creating Site Collection `"$siteURL`"..."
+            Write-Verbose "Creating Site Collection `"$siteURL`"..."
             if ($template -eq $null) {
                 $templateSwitch = @{}
             } else {
@@ -500,7 +502,7 @@ function SP-CreateSiteCollection($appPool, $database, $siteCollectionName, $site
             # Add the Portal Site Connection to the web app, unless of course the current web app *is* the portal
             # Inspired by http://www.toddklindt.com/blog/Lists/Posts/Post.aspx?ID=264
             if ($site.URL -ne $siteURL) {
-                Write-Host -ForegroundColor White " - Setting the Portal Site Connection for `"$siteCollectionName`"..."
+                Write-Verbose "Setting the Portal Site Connection for `"$siteCollectionName`"..."
                 $site.PortalName = $siteCollectionName;
                 $site.PortalUrl = $siteURL;
             }
@@ -508,7 +510,7 @@ function SP-CreateSiteCollection($appPool, $database, $siteCollectionName, $site
         }
     }
     else {
-        Write-Host -ForegroundColor White " - Skipping creation of site `"$siteCollectionName`" - already provisioned."
+        Write-Verbose "Skipping creation of site `"$siteCollectionName`"already provisioned."
     }
 }
 
@@ -530,55 +532,24 @@ function SP-CreateDefaultWebApps {
 }
 
 function SP-ConfigureEmail {
+    Write-Host -Foregroundcolor Green "Configuring Outgoing Email."
     try {
-        Write-Host -ForegroundColor White ” – Configuring Outgoing Email…”
         $loadasm = [System.Reflection.Assembly]::LoadWithPartialName(“Microsoft.SharePoint”)
         $SPGlobalAdmin = New-Object Microsoft.SharePoint.Administration.SPGlobalAdmin
-        Write-Host $smtpServer $fromEmailAddress;
-        $SPGlobalAdmin.UpdateMailSettings($smtpServer, $fromEmailAddress, $fromEmailAddress, 65001);
+        Write-Verbose "$global:smtpServer $global:fromEmailAddress";
+        $SPGlobalAdmin.UpdateMailSettings($global:smtpServer, $global:fromEmailAddress, $global:fromEmailAddress, 65001);
     }
     catch {
         $_
         Write-Warning "Failed to configure email.";
     }
+    Write-Host -Foregroundcolor Green "Done configuring Outgoing Email."
 }
 
 function SP-PostInstallation {
     # Do some post installation tasks.
-    Write-Host -ForegroundColor white " - Performing post config tasks.";
-    SP-AddHostsFileEntries;
+    Write-Host -Foregroundcolor Green "Performing post config tasks.";
+    # Add custom work here.
+    Write-Host -Foregroundcolor Green "Done performing post config tasks.";
 }
 
-function SP-AddHostsFileEntries {
-    $file = "C:\Windows\System32\drivers\etc\hosts";
-    #add-host -filename $file -ip "127.0.0.1" -hostname $lbPortalName;
-    #add-host -filename $file -ip "127.0.0.1" -hostname $lbMySiteHostName;
-}
-
-function add-host([string]$filename, [string]$ip, [string]$hostname) {
-    Write-Host -ForegroundColor white " - Adding host entry $hostname / $ip";
-	remove-host $filename $hostname
-	$ip + "`t`t" + $hostname | Out-File -encoding ASCII -append $filename
-}
-
-function remove-host([string]$filename, [string]$hostname) {
-	$c = Get-Content $filename
-	$newLines = @()
-	
-	foreach ($line in $c) {
-		$bits = [regex]::Split($line, "\t+")
-		if ($bits.count -eq 2) {
-			if ($bits[1] -ne $hostname) {
-				$newLines += $line
-			}
-		} else {
-			$newLines += $line
-		}
-	}
-	
-	# Write file
-	Clear-Content $filename
-	foreach ($line in $newLines) {
-		$line | Out-File -encoding ASCII -append $filename
-	}
-}

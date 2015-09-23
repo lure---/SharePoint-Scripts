@@ -152,7 +152,7 @@ function AddAccountToAdmin($spAccountName) {
     $managedAccountGen = Get-SPManagedAccount | Where-Object {$_.UserName -eq $($spAccountName)}
     $managedAccountDomain,$managedAccountUser = $managedAccountGen.UserName -split "\\"
     if (!($localAdmins -contains $managedAccountUser)) {
-        Write-Host -ForegroundColor White " - Adding $($managedAccountGen.Username) to local Administrators..."
+        Write-Verbose "Adding $($managedAccountGen.Username) to local Administrators..."
         ([ADSI]"WinNT://$env:COMPUTERNAME/$builtinAdminGroup,group").Add("WinNT://$managedAccountDomain/$managedAccountUser")
         # Recycle the timer service, we do this to pick up the new tokens.
         Restart-Service -Name "SPTimerV4" -Force
@@ -175,7 +175,7 @@ function AddGroupToAdmin($spGroupName) {
     $localAdmins = $adminGroup.psbase.invoke("Members") | ForEach-Object {$_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null)}
     $managedAccountDomain,$managedAccountGroup = $spGroupName -split "\\"
     if (!($localAdmins -contains $managedAccountGroup)) {
-        Write-Host -ForegroundColor White " - Adding $($managedAccountGroup) to local Administrators..."
+        Write-Verbose "Adding $($managedAccountGroup) to local Administrators..."
         ([ADSI]"WinNT://$env:COMPUTERNAME/$builtinAdminGroup,group").Add("WinNT://$managedAccountDomain/$managedAccountGroup")
         # Recycle the timer service, we do this to pick up the new tokens.
         Restart-Service -Name "SPTimerV4" -Force
@@ -200,7 +200,7 @@ function RemoveAccountFromAdmin($spAccountName) {
     $managedAccountGen = Get-SPManagedAccount | Where-Object {$_.UserName -eq $($spAccountName)}
     $managedAccountDomain,$managedAccountUser = $managedAccountGen.UserName -split "\\"
     if (($localAdmins -contains $managedAccountUser)) {
-        Write-Host -ForegroundColor White " - Removing $($managedAccountGen.Username) from local Administrators..."
+        Write-Verbose "Removing $($managedAccountGen.Username) from local Administrators..."
         ([ADSI]"WinNT://$env:COMPUTERNAME/$builtinAdminGroup,group").Remove("WinNT://$managedAccountDomain/$managedAccountUser")
         # Recycle the timer service, we do this to pick up the new tokens.
         Restart-Service -Name "SPTimerV4" -Force
@@ -215,7 +215,7 @@ function RemoveAccountFromAdmin($spAccountName) {
 }
 
 function ApplyLogFolderPermissions($path) {
-    Write-Host -ForegroundColor White " - Writing permissions for folder $path";
+    Write-Verbose "Writing permissions for folder $path";
     ApplyExplicitPermissions -path $path -identity "WSS_WPG" -permissions @("Read","Write");
     ApplyExplicitPermissions -path $path -identity "WSS_RESTRICTED_WPG_V4" -permissions @("Read","Write");
     ApplyExplicitPermissions -path $path -identity "WSS_ADMIN_WPG" -permissions @("FullControl");

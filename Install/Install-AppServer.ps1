@@ -3,6 +3,7 @@
 # Rob Garrett
 # With the help from http://autospinstaller.codeplex.com/
 
+[CmdletBinding()]
 param ([bool]$localExec = $true)
 
 $0 = $myInvocation.MyCommand.Definition
@@ -21,7 +22,7 @@ $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
 Use-RunAs;
 try {
     # Standard provisioning steps.
-    SP-ExecCommonSPServerProvisioning
+     SP-ExecCommonSPServerProvisioning
     # Configure Logging
     SP-ConfigureDiagnosticLogging;
     # Go configure services (search is a separate server).
@@ -30,19 +31,19 @@ try {
     SP-CreateMetadataServiceApp;
     SP-ConfigureClaimsToWindowsTokenService;
     SP-CreateUserProfileServiceApplication;
-    SP-CreateSPUsageApp;
-    SP-CreateSecureStoreServiceApp;
-    SP-ConfigureTracing;
-    SP-CreateBusinessDataConnectivityServiceApp;
-    SP-CreateExcelServiceApp;
-    SP-CreateVisioServiceApp;
-    SP-CreatePerformancePointServiceApp;
-    SP-CreateWordAutomationServiceApp;
-    SP-CreateAppManagementServiceApp;
-	SP-CreateSubscriptionSettingsServiceApp;
-    SP-CreateWorkManagementServiceApp;
-    SP-CreatePowerPointConversionServiceApp;
-	SP-ConfigureDistributedCacheService;
+    #SP-CreateSPUsageApp;
+    #SP-CreateSecureStoreServiceApp;
+    #SP-ConfigureTracing;
+    #SP-CreateBusinessDataConnectivityServiceApp;
+    #SP-CreateExcelServiceApp;
+    #SP-CreateVisioServiceApp;
+    #SP-CreatePerformancePointServiceApp;
+    #SP-CreateWordAutomationServiceApp;
+    #SP-CreateAppManagementServiceApp;
+	#SP-CreateSubscriptionSettingsServiceApp;
+    #SP-CreateWorkManagementServiceApp;
+    #SP-CreatePowerPointConversionServiceApp;
+	#SP-ConfigureDistributedCacheService;
     # Optional services (we don't need)
     #SP-CreateAccess2010ServiceApp;
     #SP-CreateMachineTranslationServiceApp;
@@ -53,8 +54,6 @@ try {
 catch {
     Write-Host -ForegroundColor Red "Critial Error: " $_.Exception.Message;
 }
-
-Pause;
 
 
 
