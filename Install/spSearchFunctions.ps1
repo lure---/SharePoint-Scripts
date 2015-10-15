@@ -4,54 +4,55 @@
 # With the help from http://autospinstaller.codeplex.com/
 
 function SP-ChangeIndexLocation {
-    if ($indexLocation -eq $null -or $indexLocation -eq '') {
+    if ($global:indexLocation -eq $null -or $global:indexLocation -eq '') {
         throw "indexLocation not set in the settings file.";
     }
     # Make sure it exists
-    if (!(Test-Path $indexLocation)) {
-        New-Item -Path $indexLocation -ItemType Directory
+    if (!(Test-Path $global:indexLocation)) {
+        New-Item -Path $global:indexLocation -ItemType Directory
     }
-    Write-Host -ForegroundColor yellow "Changing Search Index Location to $indexLocation";
+    Write-Verbose "Changing Search Index Location to $global:indexLocation";
     $searchSvc = Get-SPEnterpriseSearchServiceInstance -Local
-    if ($searchSvc -eq $null) { Throw "  - Unable to retrieve search service." }
-    $searchSvc | Set-SPEnterpriseSearchServiceInstance -DefaultIndexLocation $indexLocation
-    Write-Host -ForegroundColor yellow "Applying permissions to $indexLocation";
-    ApplyExplicitPermissions -path $indexLocation -identity "WSS_WPG" -permissions @("Read","Write");
-    ApplyExplicitPermissions -path $indexLocation -identity "WSS_RESTRICTED_WPG_V4" -permissions @("Read","Write");
-    ApplyExplicitPermissions -path $indexLocation -identity "WSS_ADMIN_WPG" -permissions @("FullControl");
-    $wmiPath = $indexLocation.Replace("\","\\")
+    if ($searchSvc -eq $null) { Throw "Unable to retrieve search service." }
+    $searchSvc | Set-SPEnterpriseSearchServiceInstance -DefaultIndexLocation $global:indexLocation
+    Write-Verbose "Applying permissions to $global:indexLocation";
+    ApplyExplicitPermissions -path $global:indexLocation -identity "WSS_WPG" -permissions @("Read","Write");
+    ApplyExplicitPermissions -path $global:indexLocation -identity "WSS_RESTRICTED_WPG_V4" -permissions @("Read","Write");
+    ApplyExplicitPermissions -path $global:indexLocation -identity "WSS_ADMIN_WPG" -permissions @("FullControl");
+    $wmiPath = $global:indexLocation.Replace("\","\\")
     $wmiDirectory = Get-WmiObject -Class "Win32_Directory" -Namespace "root\cimv2" -ComputerName $env:COMPUTERNAME -Filter "Name='$wmiPath'"
     # Check if folder is already compressed
     if (!($wmiDirectory.Compressed)) {
-        Write-Host -ForegroundColor Yellow "Compressing $indexLocation and subfolders..."
+        Write-Verbose "Compressing $global:indexLocation and subfolders..."
         $compress = $wmiDirectory.CompressEx("","True")
     }
 }
 
 function SP-CreateEnterpriseSearchServiceApp {
-    if ($indexLocation -eq $null -or $indexLocation -eq '') {
+    Write-Host -ForegroundColor Green "Provisioning Enterprise Search App";
+    if ($global:indexLocation -eq $null -or $global:indexLocation -eq '') {
         throw "indexLocation not set in the settings file.";
     }
     # Create enterprise search service application.
-    $secSearchServicePassword = ConvertTo-SecureString -String $spServiceAcctPwd -AsPlainText -Force;
-    Write-Host -ForegroundColor White " - Provisioning Enterprise Search...";
+    $secSearchServicePassword = ConvertTo-SecureString -String $global:spServiceAcctPwd -AsPlainText -Force;
+    Write-Verbose "Provisioning Enterprise Search...";
     $searchSvc = Get-SPEnterpriseSearchServiceInstance -Local
-    if ($searchSvc -eq $null) { Throw "  - Unable to retrieve search service." }
-    Write-Host -ForegroundColor White "  - Configuring search service..." -NoNewline
+    if ($searchSvc -eq $null) { Throw "Unable to retrieve search service." }
+    Write-Verbose "Configuring search service...";
     $internetIdentity = "Mozilla/4.0 (compatible; MSIE 4.01; Windows NT; MS Search 6.0 Robot)";
     Get-SPEnterpriseSearchService | Set-SPEnterpriseSearchService  `
-        -ContactEmail $adminEmail -ConnectionTimeout 60 `
+        -ContactEmail $global:adminEmail -ConnectionTimeout 60 `
           -AcknowledgementTimeout 60 -ProxyType Default `
           -IgnoreSSLWarnings $false -InternetIdentity $internetIdentity -PerformanceLevel "PartlyReduced" `
-          -ServiceAccount $spServiceAcctName -ServicePassword $secSearchServicePassword
-    if ($?) {Write-Host -ForegroundColor White "Done."}
+          -ServiceAccount $global:spServiceAcctName -ServicePassword $secSearchServicePassword
+    if ($?) {Write-Verbose "Done."}
     # Get application pools
-    $secContentAccessAcctPWD = ConvertTo-SecureString -String $spSearchCrawlAcctPwd -AsPlainText -Force
+    $secContentAccessAcctPWD = ConvertTo-SecureString -String $global:spSearchCrawlAcctPwd -AsPlainText -Force
     $pool = Get-SearchServiceApplicationPool;
     $adminPool = Get-SearchAdminApplicationPool "Search Admin App Pool";
     # From http://mmman.itgroove.net/2012/12/search-host-controller-service-in-starting-state-sharepoint-2013-8/
     # And http://blog.thewulph.com/?p=374
-    Write-Host -ForegroundColor White "  - Fixing registry permissions for Search Host Controller Service..." -NoNewline
+    Write-Verbose "Fixing registry permissions for Search Host Controller Service...";
     $acl = Get-Acl HKLM:\System\CurrentControlSet\Control\ComputerName
     $person = [System.Security.Principal.NTAccount] "WSS_WPG" # Trimmed down from the original "Users"
     $access = [System.Security.AccessControl.RegistryRights]::FullControl
@@ -61,13 +62,13 @@ function SP-CreateEnterpriseSearchServiceApp {
     $rule = New-Object System.Security.AccessControl.RegistryAccessRule($person, $access, $inheritance, $propagation, $type)
     $acl.AddAccessRule($rule)
     Set-Acl HKLM:\System\CurrentControlSet\Control\ComputerName $acl
-    Write-Host -ForegroundColor White "Done."
+    Write-Verbose "Done."
     # Checking the search service.
-    Write-Host -ForegroundColor White "  - Checking Search Service Instance..." -NoNewline
+    Write-Verbose "Checking Search Service Instance...";
     if ($searchSvc.Status -eq "Disabled") {
-        Write-Host -ForegroundColor White "Starting..." -NoNewline
+        Write-Host -ForegroundColor Yellow "Starting Search Service..." -NoNewline
         $searchSvc | Start-SPEnterpriseSearchServiceInstance
-        if (!$?) {Throw "  - Could not start the Search Service Instance."}
+        if (!$?) {Throw "Could not start the Search Service Instance."}
         $searchSvc = Get-SPEnterpriseSearchServiceInstance -Local
         while ($searchSvc.Status -ne "Online") {
             Write-Host -ForegroundColor Yellow "." -NoNewline
@@ -79,35 +80,35 @@ function SP-CreateEnterpriseSearchServiceApp {
     else {
         Write-Host -ForegroundColor White "Already $($searchSvc.Status)."
     }
+
     # Sync Topology
-     Write-Host -ForegroundColor White "  - Checking Search Query and Site Settings Service Instance..." -NoNewline
+    Write-Verbose "Checking Search Query and Site Settings Service Instance...";
     $searchQueryAndSiteSettingsService = Get-SPEnterpriseSearchQueryAndSiteSettingsServiceInstance -Local
     if ($searchQueryAndSiteSettingsService.Status -eq "Disabled") {
-        Write-Host -ForegroundColor White "Starting..." -NoNewline
+        Write-Host -ForegroundColor Yellow "Starting Search Query and Site Settings Service..." -NoNewline
         $searchQueryAndSiteSettingsService | Start-SPEnterpriseSearchQueryAndSiteSettingsServiceInstance
-        if (!$?) {Throw "  - Could not start the Search Query and Site Settings Service Instance."}
-            Write-Host -ForegroundColor White "Done."
+        if (!$?) {Throw "Could not start the Search Query and Site Settings Service Instance."}
+            Write-Host -ForegroundColor Yellow "Done."
         }
         else {
-            Write-Host -ForegroundColor White "Already $($searchQueryAndSiteSettingsService.Status)."
+            Write-Host -ForegroundColor Yellow "Already $($searchQueryAndSiteSettingsService.Status)."
     }
     # Search Service App.
-    Write-Host -ForegroundColor White "  - Checking Search Service Application..." -NoNewline
-    $searchApp = Get-SPEnterpriseSearchServiceApplication -Identity $searchAppName -ErrorAction SilentlyContinue
+    Write-Verbose "Checking Search Service Application...";
+    $searchApp = Get-SPEnterpriseSearchServiceApplication -Identity $global:searchAppName -ErrorAction SilentlyContinue
     if ($searchApp -eq $null) {
-        Write-Host -ForegroundColor White "Creating $($searchAppName)..." -NoNewline
-        $searchApp = New-SPEnterpriseSearchServiceApplication -Name $searchAppName `
-            -DatabaseServer $dbServer `
-            -DatabaseName $($dbPrefix + "_Service_SearchApp") `
+        Write-Verbose "Creating $($global:searchAppName)";
+        $searchApp = New-SPEnterpriseSearchServiceApplication -Name $global:searchAppName `
+            -DatabaseServer $global:dbServer `
+            -DatabaseName $($global:dbPrefix + "_Service_SearchApp") `
             -ApplicationPool $pool `
             -AdminApplicationPool $adminPool `
             -Partitioned:$false
-        if (!$?) {Throw "  - An error occurred creating the $($searchAppName) application."}
-        Write-Host -ForegroundColor White "Done."
+        if (!$?) {Throw "  - An error occurred creating the $($global:searchAppName) application."}
     }
-    else {
-        Write-Host -ForegroundColor White "Already exists."
-    }
+    
+    return;
+
 
     # Update the default Content Access Account
     $pwd = ConvertTo-SecureString "$spSearchCrawlAcctPWD" -AsPlaintext -Force
@@ -153,6 +154,7 @@ function SP-CreateEnterpriseSearchServiceApp {
 
     # Add link to resources list
     SP-AddResourcesLink $searchAppName ("searchadministration.aspx?appid=" +  $searchApp.Id);
+    Write-Host -ForegroundColor Green "Done Provisioning Enterprise Search App";
 }
 
 function SP-CreateTopologyComponent($searchApp, $searchSvc, $searchTopology, $compName, $funcNewComp) {

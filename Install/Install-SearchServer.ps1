@@ -22,11 +22,13 @@ $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
 Use-RunAs;
 try {
     # Standard provisioning steps.
-    SP-ExecCommonSPServerProvisioning
+    SP-ExecCommonSPServerProvisioning;
+    <#
     # Configure C2WTS.
     SP-ConfigureClaimsToWindowsTokenService;
     # Configure ULS.
     SP-ConfigureDiagnosticLogging;
+    #>
     # Go configure search.
     SP-CreateEnterpriseSearchServiceApp;
     # Post Configuration
@@ -35,8 +37,5 @@ try {
 catch {
     Write-Host -ForegroundColor Red "Critial Error: " $_.Exception.Message;
 }
-
-Pause;
-
 
 

@@ -30,7 +30,7 @@ try {
     SP-CreateMetadataServiceApp;
     SP-ConfigureClaimsToWindowsTokenService;
     SP-CreateUserProfileServiceApplication;
-    # TODO: Add UPS sync.
+    SP-ConfigureUPSS;
     SP-CreateSPUsageApp;
     SP-CreateSecureStoreServiceApp;
     SP-ConfigureTracing;
@@ -50,6 +50,7 @@ try {
     # TODO: Add Insights when released.
     # Post Configuration
     SP-PostInstallation;
+    #>
 }
 catch {
     Write-Host -ForegroundColor Red "Critial Error: " $_.Exception.Message;

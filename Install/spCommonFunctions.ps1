@@ -157,7 +157,7 @@ function AddAccountToAdmin($spAccountName) {
         # Recycle the timer service, we do this to pick up the new tokens.
         Restart-Service -Name "SPTimerV4" -Force
         # Wait for the timer service
-        Write-Host -ForegroundColor Yellow " - Waiting for SharePoint Timer Service to start..." -NoNewline
+        Write-Host -ForegroundColor Yellow "Waiting for SharePoint Timer Service to start..." -NoNewline
         while ((Get-Service SPTimerV4).Status -ne "Running") {
             Write-Host -ForegroundColor Yellow "." -NoNewline
             Start-Sleep 1
@@ -180,7 +180,7 @@ function AddGroupToAdmin($spGroupName) {
         # Recycle the timer service, we do this to pick up the new tokens.
         Restart-Service -Name "SPTimerV4" -Force
         # Wait for the timer service
-        Write-Host -ForegroundColor Yellow " - Waiting for SharePoint Timer Service to start..." -NoNewline
+        Write-Host -ForegroundColor Yellow "Waiting for SharePoint Timer Service to start..." -NoNewline
         while ((Get-Service SPTimerV4).Status -ne "Running") {
             Write-Host -ForegroundColor Yellow "." -NoNewline
             Start-Sleep 1
@@ -205,7 +205,7 @@ function RemoveAccountFromAdmin($spAccountName) {
         # Recycle the timer service, we do this to pick up the new tokens.
         Restart-Service -Name "SPTimerV4" -Force
         # Wait for the timer service
-        Write-Host -ForegroundColor Yellow " - Waiting for SharePoint Timer Service to start..." -NoNewline
+        Write-Host -ForegroundColor Yellow "Waiting for SharePoint Timer Service to start..." -NoNewline
         while ((Get-Service SPTimerV4).Status -ne "Running") {
             Write-Host -ForegroundColor Yellow "." -NoNewline
             Start-Sleep 1

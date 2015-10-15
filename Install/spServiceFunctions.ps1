@@ -323,7 +323,12 @@ function SP-CreateUserProfileServiceApplication {
 function SP-ConfigureUPSS {
     try {
         # Configure User Profile Sync Service
-        Write-Verbose "Configuring User Profile Sync Service";
+        Write-Host -Foregroundcolor Green "Configuring User Profile Sync Service";
+        $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
+        if ($spVer -ge 16) {
+            Write-Warning "User Profile Sync not applicable to Sharepoint 2016";
+            return;
+        }
         # Get User Profile Service
         $profileServiceApp = Get-SPServiceApplication |?{$_.DisplayName -eq $global:userProfileServiceName}
         if ($profileServiceApp -eq $null) { throw "User Profile Service App not provisioned"; }
@@ -343,11 +348,11 @@ function SP-ConfigureUPSS {
             # UPSS account is the UPS account.
             UpdateProcessIdentity $profileSyncService -svcName $spUPSAcctName;
             $profileSyncService.Update()
-            Write-Verbose "Waiting for User Profile Synchronization Service..." -NoNewline
+            Write-Verbose "Waiting for User Profile Synchronization Service..."  -NoNewline
             # Provision the User Profile Sync Service (machine uses same account as timer service)
             $profileServiceApp.SetSynchronizationMachine($env:COMPUTERNAME, $profileSyncService.Id, $spFarmAcctName, $spFarmAcctPWD);
             if (($profileSyncService.Status -ne "Provisioning") -and ($profileSyncService.Status -ne "Online")) {
-                Write-Host -ForegroundColor Yellow "`n - Waiting for User Profile Synchronization Service to start..." -NoNewline
+                Write-Host -ForegroundColor Yellow "Waiting for User Profile Synchronization Service to start..." -NoNewline
             }
             # Monitor User Profile Sync service status
             while ($profileSyncService.Status -ne "Online") {
@@ -393,6 +398,7 @@ function SP-ConfigureUPSS {
         # Remove the Farm account from admins group.
         RemoveAccountFromAdmin -spAccountName $spFarmAcctName;
     }
+    Write-Host -Foregroundcolor Green "Done Configuring User Profile Sync Service";
 }
 
 function CreateUPSAsAdmin {
