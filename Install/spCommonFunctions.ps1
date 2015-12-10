@@ -3,6 +3,25 @@
 # Rob Garrett
 # With the help from http://autospinstaller.codeplex.com/
 
+function Check-Settings {
+    Check-Setting -setting $global:dbPrefix -name "`$global:dbPrefix";
+    Check-Setting -setting $global:passphrase -name "`$global:passphrase";
+    Check-Setting -setting $global:dbServer -name "`$global:dbServer";
+    Check-Setting -setting $global:serverRole -name "`$global:serverRole";
+    Check-Setting -setting $global:spServiceAcctName -name "`$global:spServiceAcctName";
+    Check-Setting -setting $global:spServiceAcctPwd -name "`$global:spServiceAcctPwd";
+    Check-Setting -setting $global:spAppPoolAcctName -name "`$global:spAppPoolAcctName";
+    Check-Setting -setting $global:spAppPoolAcctPwd -name "`$global:spAppPoolAcctPwd";
+    Check-Setting -setting $global:CAportNumber -name "`$global:CAportNumber";
+    Check-Setting -setting $global:smtpServer -name "`$global:smtpServer";
+    Check-Setting -setting $global:fromEmailAddress -name "`$global:fromEmailAddress";
+}
+
+function Check-Setting {
+    param($setting, $name);
+    if ($setting -eq $null) { Write-Host -ForegroundColor red -BackgroundColor Yellow "'$name' not defined in settings file!"; }
+}
+
 function Use-RunAs { 
     # Check if script is running as Adminstrator and if not use RunAs 
     # Use Check Switch to check if admin  

@@ -51,6 +51,7 @@ function SP-CreateOrJoinFarm {
             # Waiting a few seconds seems to help with the Connect-SPConfigurationDatabase barging in on the New-SPConfigurationDatabase command; not sure why...
             Start-Sleep 5
             if ($spVer -eq 16) {
+                <# Invalid, WebFrontEnd, Application, SingleServer, SingleServerFarm, DistributedCache, Search, Custom #>
                 New-SPConfigurationDatabase -DatabaseName "$configDB" -DatabaseServer "$global:dbServer" -AdministrationContentDatabaseName "`
                     $centralAdminContentDB" -Passphrase $pp -FarmCredentials $farmCredential -LocalServerRole $global:serverRole;
             } elseif ($spVer -eq 15) {
@@ -262,17 +263,30 @@ function Check-PSConfig {
 function SP-ConfigureDiagnosticLogging {
     # Configure logging.
     Write-Host -Foregroundcolor Green "Configuring logging";
+    $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
     Write-Verbose "Configuring SharePoint diagnostic (ULS) logging..."
     Write-Verbose "Setting SharePoint diagnostic (ULS) logging options:"
     Write-Verbose "  - DaysToKeepLogs: $global:logDaysToKeepLogs"
     Write-Verbose "  - LogDiskSpaceUsageGB: $global:logSpaceUsage"
     Write-Verbose "  - LogLocation: $global:logLocation"
     Write-Verbose "  - LogCutInterval: $global:logCutInterval"
+    if ($global:logDaysToKeepLogs -eq $null) {
+        $global:logDaysToKeepLogs = 10;
+    }
+    if ($global:logSpaceUsage -eq $null) {
+        $global:logSpaceUsage = 10;
+    }
+    if ($global:logLocation -eq $null) {
+        $global:logLocation = "$env:CommonProgramFiles\microsoft shared\Web Server Extensions\$spVer\LOGS";
+    }
+    if ($global:logCutInterval -eq $null) {
+        $global:logCutInterval = 30;
+    }
     Set-SPDiagnosticConfig -DaysToKeepLogs $global:logDaysToKeepLogs -LogMaxDiskSpaceUsageEnabled:$true `
         -LogDiskSpaceUsageGB $global:logSpaceUsage -LogLocation $global:logLocation -LogCutInterval $global:logCutInterval
     # Finally, enable NTFS compression on the ULS log location to save disk space
     # Replace \ with \\ for WMI
-    $wmiPath = $logLocation.Replace("\","\\")
+    $wmiPath = $global:logLocation.Replace("\","\\")
     $wmiDirectory = Get-WmiObject -Class "Win32_Directory" -Namespace "root\cimv2" -ComputerName $env:COMPUTERNAME -Filter "Name='$wmiPath'"
     # Check if folder is already compressed
     if (!($wmiDirectory.Compressed)) {
@@ -283,7 +297,6 @@ function SP-ConfigureDiagnosticLogging {
         Write-Verbose "$folder is already compressed."
     }
     ApplyLogFolderPermissions -path $global:logLocation;
-    $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
     $where = ([String]"$env:CommonProgramFiles\microsoft shared\Web Server Extensions\$spVer\LOGS").ToLower();
     if (!$global:logLocation.ToLower().StartsWith($where)) {
         ApplyLogFolderPermissions -path $where;
@@ -399,7 +412,6 @@ function SP-CreateManagedAccounts {
     }
     SP-RegisterManagedAccount -username $global:spAppPoolAcctName -password $global:spAppPoolAcctPwd
     SP-RegisterManagedAccount -username $global:spServiceAcctName -password $global:spServiceAcctPwd
-    SP-RegisterManagedAccount -username $global:spc2WTSAcctName -password $global:spc2WTSAcctPwd
     Write-Host -Foregroundcolor Green "Done adding Managed Accounts."
 }
 
