@@ -45,7 +45,12 @@ function SP-CreateOrJoinFarm {
         Write-Verbose "Attempting to join farm on `"$configDB`"..."
         $pp = ConvertTo-SecureString "$global:passphrase" -AsPlaintext -Force
         $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
-        $connectFarm = Connect-SPConfigurationDatabase -DatabaseName "$configDB" -Passphrase $pp -DatabaseServer "$global:dbServer" -ErrorAction SilentlyContinue
+        if ($spVer -eq 16) {
+            <# Invalid, WebFrontEnd, Application, SingleServer, SingleServerFarm, DistributedCache, Search, Custom #>
+            $connectFarm = Connect-SPConfigurationDatabase -DatabaseName "$configDB" -Passphrase $pp -DatabaseServer "$global:dbServer" -LocalServerRole $global:serverRole -ErrorAction SilentlyContinue
+        } else {
+            $connectFarm = Connect-SPConfigurationDatabase -DatabaseName "$configDB" -Passphrase $pp -DatabaseServer "$global:dbServer" -ErrorAction SilentlyContinue
+        }
         if (-not $?) {
             Write-Verbose "No existing farm found - Creating config database `"$configDB`"..."
             # Waiting a few seconds seems to help with the Connect-SPConfigurationDatabase barging in on the New-SPConfigurationDatabase command; not sure why...
@@ -456,6 +461,7 @@ function SP-CreateWebApp($appPool, $webAppName, $database, $url, $port, $hosthea
 }
 
 function SP-CreateSiteCollection($appPool, $database, $siteCollectionName, $siteURL, $template = $null) {
+    Write-Host -foregroundcolor Green "Creating Web App for site collection $siteURL";
     # Get the web app
     $webApp = Get-SPWebApplication | Where-Object { ($_.ApplicationPool).Name -eq $appPool }
     if ($webApp -eq $null) { throw "Failed to get web application"; }
@@ -500,6 +506,7 @@ function SP-CreateSiteCollection($appPool, $database, $siteCollectionName, $site
     else {
         Write-Verbose "Skipping creation of site `"$siteCollectionName`"already provisioned."
     }
+    Write-Host -foregroundcolor Green "Done creating Web App for site collection $siteURL";
 }
 
 function SP-CreateMySiteHost {
@@ -516,7 +523,6 @@ function SP-CreateDefaultWebApps {
         -database ($global:dbPrefix + "_Content_Portal") -url "http://$env:COMPUTERNAME" -port 80
     SP-CreateSiteCollection -appPool "Portal App Pool" -database ($global:dbPrefix + "_Content_Portal") `
         -siteCollectionName "Portal" -siteURL "http://$env:COMPUTERNAME" -template "STS#0"
-    SP-CreateMySiteHost;
 }
 
 function SP-ConfigureEmail {

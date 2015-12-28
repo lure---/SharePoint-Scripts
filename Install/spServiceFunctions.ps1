@@ -41,6 +41,13 @@ function Get-HostedServicesAppPool {
 function SP-ConfigureSandboxedCodeService {
     # Configure the sandbox code service.
     Write-Host -Foregroundcolor Green "Starting Sandboxed Code Service"
+    $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
+    if ($spVer -ge 16 -and $global:serverRole -ine "Custom") {
+        # TODO: I should check this, seems to be the case when I deploy to "Application or WebFrontEnd"
+        Write-Warning "Sandboxed Code Service supports legacy sandbox applications."
+        Write-Warning "Deploying this service to non-Custom server roles wil break MinRole compliance.";
+        return;
+    }
     $sandboxedCodeServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Administration.SPUserCodeServiceInstance"}
     $sandboxedCodeService = $sandboxedCodeServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
     if ($sandboxedCodeService.Status -ne "Online") {

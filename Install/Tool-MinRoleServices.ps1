@@ -57,7 +57,7 @@ try {
         Write-Host "MinRole: $_";
         [System.Collections.ArrayList]$item = $servicesInRole.Get_Item($_);
         $item | % {
-            Write-Host "Service $_";
+            Write-Host "Service: $_";
         }
         Write-Host;
     }
