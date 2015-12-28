@@ -22,10 +22,15 @@ Use-RunAs;
 try {
     # Standard provisioning steps.
     SP-ExecCommonSPServerProvisioning
-    # Configure C2WTS.
-    SP-ConfigureClaimsToWindowsTokenService;
     # Configure Logging
     SP-ConfigureDiagnosticLogging;
+    # Configure services as part of minrole compliance
+    SP-ConfigureSandboxedCodeService;
+    SP-CreateAccessServicesApp;
+    SP-CreateAccess2010ServiceApp;
+    SP-CreateExcelServiceApp;
+    SP-CreateVisioServiceApp;
+    SP-CreatePerformancePointServiceApp;
     # Create default web apps.
     SP-CreateDefaultWebApps
     # Post Configuration

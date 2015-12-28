@@ -25,32 +25,22 @@ try {
     # Configure Logging
     SP-ConfigureDiagnosticLogging;
     # Go configure services (search is a separate server).
-    SP-ConfigureSandboxedCodeService;
     SP-CreateStateServiceApp;
     SP-CreateMetadataServiceApp;
-    SP-ConfigureClaimsToWindowsTokenService;
     SP-CreateUserProfileServiceApplication;
     SP-ConfigureUPSS;
-    SP-CreateSPUsageApp;
     SP-CreateSecureStoreServiceApp;
     SP-ConfigureTracing;
     SP-CreateBusinessDataConnectivityServiceApp;
-    SP-CreateExcelServiceApp;
-    SP-CreateVisioServiceApp;
-    SP-CreatePerformancePointServiceApp;
     SP-CreateWordAutomationServiceApp;
     SP-CreateSubscriptionSettingsServiceApp;
     SP-CreateAppManagementServiceApp;
-    SP-CreateWorkManagementServiceApp;
     SP-CreatePowerPointConversionServiceApp;
-    SP-CreateAccess2010ServiceApp;
     SP-CreateMachineTranslationServiceApp;
-    # TODO: Fix Access Services.
-    #SP-CreateAccessServicesApp;
-    # TODO: Add Insights when released.
+    SP-CreateWorkManagementServiceApp;
+    SP-CreateSPUsageApp;
     # Post Configuration
     SP-PostInstallation;
-    #>
 }
 catch {
     Write-Host -ForegroundColor Red "Critial Error: " $_.Exception.Message;

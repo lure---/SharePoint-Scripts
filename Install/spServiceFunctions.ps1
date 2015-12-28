@@ -3,7 +3,8 @@
 # Rob Garrett
 # With the help from http://autospinstaller.codeplex.com/
 
-function UpdateProcessIdentity ($serviceToUpdate, $svcName = $null) {
+function UpdateProcessIdentity {
+    param($serviceToUpdate, $svcName = $null);
     # Update service to use SP service account.
     # Managed Account
     if ($svcName -eq $null) { $svcName = $global:spServiceAcctName; }
@@ -150,20 +151,22 @@ function SP-CreateMetadataServiceApp {
                 $metaDataServiceAppProxy.Properties.IsDefaultSiteCollectionTaxonomy = $true
                 $metaDataServiceAppProxy.Update()
             }
-            Write-Verbose "Granting rights to Metadata Service Application:"
-            # Get ID of "Managed Metadata Service"
-            $metadataServiceAppToSecure = Get-SPServiceApplication | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Taxonomy.MetadataWebServiceApplication"}
-            $metadataServiceAppIDToSecure = $metadataServiceAppToSecure.Id
-            # Create a variable that contains the list of administrators for the service application
-            $metadataServiceAppSecurity = Get-SPServiceApplicationSecurity $metadataServiceAppIDToSecure
-            # Create a variable that contains the claims principal for the service accounts
-            Write-Verbose "$($global:spAdminAcctName)..."
-            $accountPrincipal = New-SPClaimsPrincipal -Identity $global:spAdminAcctName -IdentityType WindowsSamAccountName
-            # Give permissions to the claims principal you just created
-            Grant-SPObjectSecurity $metadataServiceAppSecurity -Principal $accountPrincipal -Rights "Full Access to Term Store"
-            # Apply the changes to the Metadata Service application
-            Set-SPServiceApplicationSecurity $metadataServiceAppIDToSecure -objectSecurity $metadataServiceAppSecurity
-            Write-Verbose "Done granting rights."
+            if ($global:spAdminAcctName -ne $null) {
+                Write-Verbose "Granting rights to Metadata Service Application:"
+                # Get ID of "Managed Metadata Service"
+                $metadataServiceAppToSecure = Get-SPServiceApplication | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Taxonomy.MetadataWebServiceApplication"}
+                $metadataServiceAppIDToSecure = $metadataServiceAppToSecure.Id
+                # Create a variable that contains the list of administrators for the service application
+                $metadataServiceAppSecurity = Get-SPServiceApplicationSecurity $metadataServiceAppIDToSecure
+                # Create a variable that contains the claims principal for the admin account
+                Write-Verbose "$($global:spAdminAcctName)..."
+                $accountPrincipal = New-SPClaimsPrincipal -Identity $global:spAdminAcctName -IdentityType WindowsSamAccountName
+                # Give permissions to the claims principal you just created
+                Grant-SPObjectSecurity $metadataServiceAppSecurity -Principal $accountPrincipal -Rights "Full Access to Term Store"
+                # Apply the changes to the Metadata Service application
+                Set-SPServiceApplicationSecurity $metadataServiceAppIDToSecure -objectSecurity $metadataServiceAppSecurity
+                Write-Verbose "Done granting rights."
+            }
             Write-Verbose "Done creating Managed Metadata Service Application."
         }
     } catch {
@@ -326,7 +329,8 @@ function SP-ConfigureUPSS {
         Write-Host -Foregroundcolor Green "Configuring User Profile Sync Service";
         $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
         if ($spVer -ge 16) {
-            Write-Warning "User Profile Sync not applicable to Sharepoint 2016";
+            Write-Warning "User Profile Sync not applicable to Sharepoint 2016, use Microsoft Identity Manager instead.";
+            Write-Warning "https://technet.microsoft.com/en-us/library/mt627723(v=office.16).aspx";
             return;
         }
         # Get User Profile Service
@@ -617,6 +621,7 @@ function SP-CreateExcelServiceApp {
     $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
     if ($spVer -ge 16) {
         Write-Warning "Excel services not available from Sharepoint 2016";
+        Write-Warning "Use Office Online Server https://technet.microsoft.com/en-us/library/jj219456(v=office.16).aspx";
         return;
     }
     # Create excel services.
