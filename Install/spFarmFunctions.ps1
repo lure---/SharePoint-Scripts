@@ -345,7 +345,8 @@ function SP-ConfigureLanguagePacks {
     Write-Host -Foregroundcolor Green "Done configuring language packs";
 }
 
-function SP-RegisterManagedAccount($username, $password) {
+function SP-RegisterManagedAccount {
+    param($username, $password);
     $password = ConvertTo-SecureString "$password" -AsPlaintext -Force
     $alreadyAdmin = $false
     # The following was suggested by Matthias Einig (http://www.codeplex.com/site/users/view/matein78)
@@ -420,7 +421,8 @@ function SP-CreateManagedAccounts {
     Write-Host -Foregroundcolor Green "Done adding Managed Accounts."
 }
 
-function SP-CreateWebApp($appPool, $webAppName, $database, $url, $port, $hostheader = $null) {
+function SP-CreateWebApp {
+    param($appPool, $webAppName, $database, $url, $port, $hostheader = $null);
     # Check for an existing App Pool
     $existingWebApp = Get-SPWebApplication | Where-Object { ($_.ApplicationPool).Name -eq $appPool }
     $appPoolExists = ($existingWebApp -ne $null);
@@ -445,7 +447,8 @@ function SP-CreateWebApp($appPool, $webAppName, $database, $url, $port, $hosthea
         $appPoolAccountSwitch = @{ApplicationPoolAccount = $($spAppPoolAcctName)}
     }
     # See if the we have the app already
-    $getSPWebApplication = Get-SPWebApplication | Where-Object {$_.DisplayName -eq $webAppName}
+    Write-Verbose "Checking existence of web app $($url):$($port)";
+    $getSPWebApplication = Get-SPWebApplication "$($url):$($port)";
     if ($getSPWebApplication -eq $null) {
         Write-Verbose "Creating Web App `"$webAppName`""
         $hostHeaderSwitch = @{}
@@ -514,7 +517,7 @@ function SP-CreateMySiteHost {
     SP-CreateWebApp -appPool "MySite Host App Pool" -webAppName "MySite Host" `
         -database ($global:dbPrefix + "_Content_MySiteHost") -url "http://$env:COMPUTERNAME" -port 8080
     SP-CreateSiteCollection -appPool "MySite Host App Pool" -database ($global:dbPrefix + "_Content_MySiteHost") `
-        -siteCollectionName "MySite Host" -siteURL ("http://" + $env:COMPUTERNAME + ":8080") -template "SPSMSITEHOST#0"
+        -siteCollectionName "MySite Host" -siteURL $global:mySiteHost -template "SPSMSITEHOST#0"
 }
 
 function SP-CreateDefaultWebApps {

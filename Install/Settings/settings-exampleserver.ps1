@@ -23,6 +23,9 @@ $global:spAppPoolAcctPwd = "mypassword";
 $global:spSearchCrawlAcctName = "DOMAIN\spsearch";
 $global:spSearchCrawlAcctPwd = "mypassword";
 
+# MySite Host location
+$global:mySiteHost = "http://mysiteUrl";
+
 # Logging Settings.
 $global:logDaysToKeepLogs = 2;
 $global:logSpaceUsage = 5;
