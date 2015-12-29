@@ -3,14 +3,25 @@
 # Rob Garrett
 # With the help from http://autospinstaller.codeplex.com/
 
+function Create-IndexLocation {
+    if (!(Test-Path $global:indexLocation)) {
+        Write-Verbose "Creating index location $global:indexLocation";
+        New-Item $global:indexLocation -type directory | Out-Null;
+    }
+    $wmiPath = $global:indexLocation.Replace("\","\\")
+    $wmiDirectory = Get-WmiObject -Class "Win32_Directory" -Namespace "root\cimv2" -ComputerName $env:COMPUTERNAME -Filter "Name='$wmiPath'"
+    if (!($wmiDirectory.Compressed)) {
+        Write-Verbose "Compressing index location $global:indexLocation";
+        $compress = $wmiDirectory.CompressEx("","True")
+    }
+}
+
 function SP-ChangeIndexLocation {
     if ($global:indexLocation -eq $null -or $global:indexLocation -eq '') {
         throw "indexLocation not set in the settings file.";
     }
     # Make sure it exists
-    if (!(Test-Path $global:indexLocation)) {
-        New-Item -Path $global:indexLocation -ItemType Directory
-    }
+    if (!(Test-Path $global:indexLocation)) { Create-IndexLocation; }
     Write-Verbose "Changing Search Index Location to $global:indexLocation";
     $searchSvc = Get-SPEnterpriseSearchServiceInstance -Local
     if ($searchSvc -eq $null) { Throw "Unable to retrieve search service." }
@@ -29,6 +40,16 @@ function SP-ChangeIndexLocation {
 }
 
 function SP-CreateEnterpriseSearchServiceApp {
+    $currentServer = Get-SPServer $env:COMPUTERNAME;
+    if ($currentServer.Role -ine "Search" -and $currentServer.Role -ine "Custom" -and $currentServer.Role -ine "SingleServerFarm") {
+        Write-Warning "Current server is not a search, single server farm, or custom role";
+        Write-Warning "Changing role to custom";
+        Set-SPServer -Identity $env:COMPUTERNAME -Role Custom;
+        while ($currentServer.Role -ine "Custom") {
+            Sleep 1;
+            $currentServer = Get-SPServer $env:COMPUTERNAME;
+        }
+    }
     Write-Host -ForegroundColor Green "Provisioning Enterprise Search App";
     if ($global:indexLocation -eq $null -or $global:indexLocation -eq '') {
         throw "indexLocation not set in the settings file.";
@@ -47,7 +68,6 @@ function SP-CreateEnterpriseSearchServiceApp {
           -ServiceAccount $global:spServiceAcctName -ServicePassword $secSearchServicePassword
     if ($?) {Write-Verbose "Done."}
     # Get application pools
-    $secContentAccessAcctPWD = ConvertTo-SecureString -String $global:spSearchCrawlAcctPwd -AsPlainText -Force
     $pool = Get-SearchServiceApplicationPool;
     $adminPool = Get-SearchAdminApplicationPool "Search Admin App Pool";
     # From http://mmman.itgroove.net/2012/12/search-host-controller-service-in-starting-state-sharepoint-2013-8/
@@ -78,7 +98,7 @@ function SP-CreateEnterpriseSearchServiceApp {
         Write-Host -BackgroundColor Yellow -ForegroundColor Black $($searchSvc.Status)
     }
     else {
-        Write-Host -ForegroundColor White "Already $($searchSvc.Status)."
+        #Write-Verbose "Already $($searchSvc.Status)."
     }
 
     # Sync Topology
@@ -106,19 +126,17 @@ function SP-CreateEnterpriseSearchServiceApp {
             -Partitioned:$false
         if (!$?) {Throw "  - An error occurred creating the $($global:searchAppName) application."}
     }
-    
-    return;
-
 
     # Update the default Content Access Account
-    $pwd = ConvertTo-SecureString "$spSearchCrawlAcctPWD" -AsPlaintext -Force
-    Update-SearchContentAccessAccount $($searchAppName) $searchApp $($spSearchCrawlAcctName) $pwd
+    $pwd = ConvertTo-SecureString $global:spSearchCrawlAcctPWD -AsPlaintext -Force
+    Update-SearchContentAccessAccount $($global:searchAppName) $searchApp $($global:spSearchCrawlAcctName) $pwd
 
     # If the index location isn't already set to either the default location or our custom-specified location, set the default location for the search service instance
-    if ($indexLocation -ne $searchSvc.DefaultIndexLocation) {
-        Write-Host -ForegroundColor White "  - Setting default index location on search service instance..." -NoNewline
-        $searchSvc | Set-SPEnterpriseSearchServiceInstance -DefaultIndexLocation $indexLocation -ErrorAction SilentlyContinue
-        if ($?) {Write-Host -ForegroundColor White "Done."}
+    if ($global:indexLocation -ne $searchSvc.DefaultIndexLocation) {
+        Create-IndexLocation;
+        Write-Verbose "Setting default index location on search service instance...";
+        $searchSvc | Set-SPEnterpriseSearchServiceInstance -DefaultIndexLocation $global:indexLocation -ErrorAction SilentlyContinue
+        if ($?) {Write-Verbose "Done setting index location."}
     }
 
     # Create the search topology
@@ -126,18 +144,15 @@ function SP-CreateEnterpriseSearchServiceApp {
 
     # Create proxy
     $searchAppProxyName = "$searchAppName Proxy";
-    Write-Host -ForegroundColor White "  - Checking search service application proxy..." -NoNewline
+    Write-Verbose "Checking search service application proxy...";
     if (!(Get-SPEnterpriseSearchServiceApplicationProxy -Identity $searchAppProxyName -ErrorAction SilentlyContinue)) {
-        Write-Host -ForegroundColor White "Creating..." -NoNewline
+        Write-Verbose "Creating search service application proxy";
         $searchAppProxy = New-SPEnterpriseSearchServiceApplicationProxy -Name $searchAppProxyName -SearchApplication $searchAppName
-        if ($?) {Write-Host -ForegroundColor White "Done."}
-    }
-    else {
-        Write-Host -ForegroundColor White "Already exists."
+        if ($?) {Write-Verbose "Done creating search service application proxy";}
     }
 
     # Check the Search Host Controller Service for a known issue ("stuck on starting")
-    Write-Host -ForegroundColor White "  - Checking for stuck Search Host Controller Service (known issue)..."
+    Write-Verbose "Checking for stuck Search Host Controller Service (known issue)..."
     $searchHostServices = Get-SPServiceInstance | ? {$_.TypeName -eq "Search Host Controller Service"}
     foreach ($sh in $searchHostServices) {
         Write-Host -ForegroundColor White "   - Server: $($sh.Parent.Address)..." -NoNewline
@@ -157,47 +172,48 @@ function SP-CreateEnterpriseSearchServiceApp {
     Write-Host -ForegroundColor Green "Done Provisioning Enterprise Search App";
 }
 
-function SP-CreateTopologyComponent($searchApp, $searchSvc, $searchTopology, $compName, $funcNewComp) {
+function SP-CreateTopologyComponent {
+    param($searchApp, $searchSvc, $searchTopology, $compName, $funcNewComp);
     # Create a topology component
-    Write-Host -ForegroundColor White "  - Checking $compName component..." -NoNewline
+    Write-Verbose "Checking $compName component...";
     $components = $clone.GetComponents() | Where-Object {$_.Name -like ($compName + "Component*")}
     if (!($components | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME})) {
-        Write-Host -ForegroundColor White "Creating..." -NoNewline
+        Write-Verbose "Creating search component $compName...";
         & $funcNewComp –SearchTopology $searchTopology -SearchServiceInstance $searchSvc | Out-Null
         if (!$?) { throw "Failed to create new search component"; }
-        Write-Host -ForegroundColor White "Done."
-    }
-    else {
-        Write-Host -ForegroundColor White "Already exists on this server."
+        Write-Verbose "Done creating search component $compName";
     }
     # Get components on this server.
     return $clone.GetComponents() | Where-Object {$_.Name -like ($compName + "Component*") -and `
         $_.ServerName -imatch $env:COMPUTERNAME}; 
 }
 
-function SP-RemoveTopologyComponent($searchApp, $searchSvc, $searchTopology, $compName) {
-    Write-Host -ForegroundColor White "  - Checking $compName component..." -NoNewline
+function SP-RemoveTopologyComponent {
+    param($searchApp, $searchSvc, $searchTopology, $compName);
+    Write-Verbose "Checking $compName component...";
     $components = $clone.GetComponents() | Where-Object `
         {$_.Name -like ($compName + "Component*") -and $_.ServerName -imatch $env:COMPUTERNAME}; 
     if ($components) {
         # Component exists on this server, so remove it.
-        Write-Host -ForegroundColor White "Removing..." -NoNewline
+        Write-Verbose "Removing search component...";
         foreach ($comp in $components) {
             Remove-SPEnterpriseSearchComponent -SearchTopology $searchTopology -Identity $comp -Confirm:$false;
         }
+        Write-Verbose "Done Removing Search Component";
     }
-    Write-Host -ForegroundColor White "Done.";
     # Determine if this component lives in the farm on another server.
     return $clone.GetComponents() | Where-Object {$_.Name -like ($compName + "Component*") -and `
         $_.ServerName -inotmatch $env:COMPUTERNAME}; 
 }
 
-function SP-NewIndexSearchComponent($SearchTopology, $SearchServiceInstance) {
+function SP-NewIndexSearchComponent {
+    param($SearchTopology, $SearchServiceInstance);
     # Specify the RootDirectory parameter only if it's different than the default path
+    $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
     $dataDir = "$env:ProgramFiles\Microsoft Office Servers\$spVer.0\Data";
-    if ($indexLocation -ne "$dataDir\Office Server\Applications") {
-        New-Item -ItemType Directory -Force $indexLocation;
-        $rootDirectorySwitch = @{RootDirectory = $indexLocation }
+    if ($global:indexLocation -ne "$dataDir\Office Server\Applications") {
+        if (!(Test-Path $global:indexLocation)) { Create-IndexLocation; }
+        $rootDirectorySwitch = @{RootDirectory = $global:indexLocation }
     }
     else {
         $rootDirectorySwitch = @{}
@@ -206,31 +222,32 @@ function SP-NewIndexSearchComponent($SearchTopology, $SearchServiceInstance) {
         -SearchServiceInstance $SearchServiceInstance @rootDirectorySwitch | Out-Null
 }
 
-function SP-CreateSearchTopology($searchApp, $searchSvc) {
+function SP-CreateSearchTopology {
+    param($searchApp, $searchSvc);
     # Look for a topology that has components, or is still Inactive, because that's probably our $clone
     $clone = $searchApp.Topologies | Where {$_.ComponentCount -gt 0 -and $_.State -eq "Inactive"} | Select-Object -First 1
     if (!$clone) {
         # Clone the active topology
-        Write-Host -ForegroundColor White "  - Cloning the active search topology..."
+        Write-Verbose "Cloning the active search topology..."
         #$clone = $searchApp.ActiveTopology.Clone();
         $clone = New-SPEnterpriseSearchTopology -SearchApplication $searchApp -Clone -SearchTopology $searchApp.ActiveTopology;
     }
     else {
-        Write-Host -ForegroundColor White "  - Using existing cloned search topology."
+        Write-Verbose "Using existing cloned search topology."
         # Since this clone probably doesn't have all its components added yet, we probably want to keep it if it isn't activated after this pass
         $keepClone = $true
     }
 
     # Count current components in clone.
     $count = $clone.ComponentCount;
-    Write-Host -ForegroundColor white "  - Clone has $count components...";
+    Write-Verbose "Clone has $count components...";
 
     # Note any new topology must have all the components to activate it.
     $activateTopology = $false;
 
     # Check if each search component is already assigned to the current server, 
     # then check that it's actually being requested for the current server, then create it as required.
-    if ($crawlServers -icontains $env:COMPUTERNAME) {
+    if ($global:crawlServers -icontains $env:COMPUTERNAME) {
         # This server is a crawl server.
         # Admin Component
         $adminComponentReady = SP-CreateTopologyComponent `
@@ -265,7 +282,7 @@ function SP-CreateSearchTopology($searchApp, $searchSvc) {
             -funcNewComp "New-SPEnterpriseSearchCrawlComponent"
 
         # Remove Query components?
-        if (!($queryServers -icontains $env:COMPUTERNAME)) {
+        if (!($global:queryServers -icontains $env:COMPUTERNAME)) {
             # Index.
             $indexComponentReady = SP-RemoveTopologyComponent `
                 -searchApp $searchApp `
@@ -281,7 +298,7 @@ function SP-CreateSearchTopology($searchApp, $searchSvc) {
         }
     }
 
-    if ($queryServers -icontains $env:COMPUTERNAME) {
+    if ($global:queryServers -icontains $env:COMPUTERNAME) {
         # This server is a query server.
         # Index Component
         $indexComponentReady = SP-CreateTopologyComponent `
@@ -300,7 +317,7 @@ function SP-CreateSearchTopology($searchApp, $searchSvc) {
             -funcNewComp "New-SPEnterpriseSearchQueryProcessingComponent"
 
         # Remove crawl components?
-        if (!($crawlServers -icontains $env:COMPUTERNAME)) {
+        if (!($global:crawlServers -icontains $env:COMPUTERNAME)) {
             # Admin Component
             $adminComponentReady = SP-RemoveTopologyComponent `
                 -searchApp $searchApp `
@@ -336,17 +353,18 @@ function SP-CreateSearchTopology($searchApp, $searchSvc) {
         $indexComponentReady -and $crawlComponentReady -and $queryComponentReady) {$activateTopology = $true}
     # Check if any new search components were added 
     # (or if we have a clone with more/less components than the current active topology) and if we're ready to activate the topology
-    Write-Host -ForegroundColor White "  - Clone components:" $clone.ComponentCount "Current Search App components:" $searchApp.ActiveTopology.ComponentCount;
+    Write-Verbose "Clone components: $($clone.ComponentCount) Current Search App components: $($searchApp.ActiveTopology.ComponentCount)";
+
     if ($newComponentsCreated -or ($clone.ComponentCount -ne $searchApp.ActiveTopology.ComponentCount)) {
         if ($activateTopology) {
-            Write-Host -ForegroundColor White "  - Activating Search Topology..." -NoNewline
+            Write-Verbose "Activating Search Topology...";
             $clone.Activate()
             if ($?) {
-                Write-Host -ForegroundColor White "Done."
+                Write-Verbose "Done activating search topology";
                 # Clean up original or previous unsuccessfully-provisioned search topologies
                 $inactiveTopologies = $searchApp.Topologies | Where {$_.State -eq "Inactive"}
                 if ($inactiveTopologies -ne $null) {
-                    Write-Host -ForegroundColor White "  - Removing old, inactive search topologies:"
+                    Write-Verbose "Removing old, inactive search topologies:"
                     foreach ($inactiveTopology in $inactiveTopologies) {
                         Write-Host -ForegroundColor White "   -"$inactiveTopology.TopologyId.ToString()
                         $inactiveTopology.Delete()
@@ -355,30 +373,31 @@ function SP-CreateSearchTopology($searchApp, $searchSvc) {
             }
         }
         else {
-            Write-Host -ForegroundColor White "  - Not activating topology yet as there seem to be components still pending."
+            Write-Verbose "Not activating topology yet as there seem to be components still pending."
         }
     }
     elseif ($keepClone -ne $true) {
         # Delete the newly-cloned topology since nothing was done 
         # TODO: Check that the search topology is truly complete and there are no more servers to install
-        Write-Host -ForegroundColor White "  - Deleting unneeded cloned topology..."
+        Write-Verbose "Deleting unneeded cloned topology..."
         $clone.Delete()
     }
     # Clean up any empty, inactive topologies
     $emptyTopologies = $searchApp.Topologies | Where {$_.ComponentCount -eq 0 -and $_.State -eq "Inactive"}
     if ($emptyTopologies -ne $null) {
-        Write-Host -ForegroundColor White "  - Removing empty and inactive search topologies:"
+        Write-Verbose "Removing empty and inactive search topologies:"
         foreach ($emptyTopology in $emptyTopologies) {
-            Write-Host -ForegroundColor White "  -"$emptyTopology.TopologyId.ToString()
+            Write-Verbose $emptyTopology.TopologyId.ToString()
             $emptyTopology.Delete()
         }
     }
 }
 
-function Update-SearchContentAccessAccount ($saName, $sa, $caa, $caapwd) {
+function Update-SearchContentAccessAccount {
+    param($saName, $sa, $caa, $caapwd);
     # Set the crawl account.
     try {
-        Write-Host -ForegroundColor White "  - Setting content access account for $saName..."
+        Write-Verbose "Setting content access account for $saName..."
         $sa | Set-SPEnterpriseSearchServiceApplication -DefaultContentAccessAccountName $caa -DefaultContentAccessAccountPassword $caapwd -ErrorVariable err
     }
     catch {
@@ -398,18 +417,18 @@ function Update-SearchContentAccessAccount ($saName, $sa, $caa, $caapwd) {
 function Get-SearchServiceApplicationPool {
     # Try and get the application pool if it already exists
     # SLN: Updated names
-    $pool = Get-SPServiceApplicationPool -Identity $searchSvcAppPoolName -ErrorVariable err -ErrorAction SilentlyContinue
+    $pool = Get-SPServiceApplicationPool -Identity $global:searchSvcAppPoolName -ErrorVariable err -ErrorAction SilentlyContinue
     if ($err) {
         # The application pool does not exist so create.
-        Write-Host -ForegroundColor White "  - Getting $($spServiceAcctName) account for application pool..."
-        $managedAccountSearch = (Get-SPManagedAccount -Identity $spServiceAcctName -ErrorVariable err -ErrorAction SilentlyContinue)
+        Write-Verbose "Getting $($global:spServiceAcctName) account for application pool..."
+        $managedAccountSearch = (Get-SPManagedAccount -Identity $global:spAppPoolAcctName -ErrorVariable err -ErrorAction SilentlyContinue)
         if ($err) {
-            $appPoolConfigPWD = (ConvertTo-SecureString $spServiceAcctPwd -AsPlainText -force)
-            $accountCred = New-Object System.Management.Automation.PsCredential $spServiceAcctName,$appPoolConfigPWD
+            $appPoolConfigPWD = (ConvertTo-SecureString $global:spAppPoolAcctPwd -AsPlainText -force)
+            $accountCred = New-Object System.Management.Automation.PsCredential $global:spAppPoolAcctName,$appPoolConfigPWD
             $managedAccountSearch = New-SPManagedAccount -Credential $accountCred
         }
-        Write-Host -ForegroundColor White "  - Creating $($searchSvcAppPoolName)..."
-        $pool = New-SPServiceApplicationPool -Name $($searchSvcAppPoolName) -Account $managedAccountSearch
+        Write-Verbose "Creating $($global:searchSvcAppPoolName)..."
+        $pool = New-SPServiceApplicationPool -Name $($global:searchSvcAppPoolName) -Account $managedAccountSearch
     }
     return $pool
 }
@@ -417,18 +436,18 @@ function Get-SearchServiceApplicationPool {
 function Get-SearchAdminApplicationPool {
     # Try and get the application pool if it already exists
     # SLN: Updated names
-    $pool = Get-SPServiceApplicationPool -Identity $searchAdminAppPoolName -ErrorVariable err -ErrorAction SilentlyContinue
+    $pool = Get-SPServiceApplicationPool -Identity $global:searchAdminAppPoolName -ErrorVariable err -ErrorAction SilentlyContinue
     if ($err) {
         # The application pool does not exist so create.
-        Write-Host -ForegroundColor White "  - Getting $($spAppPoolAcctName) account for application pool..."
-        $managedAccountSearch = (Get-SPManagedAccount -Identity $spAppPoolAcctName -ErrorVariable err -ErrorAction SilentlyContinue)
+        Write-Verbose "Getting $($global:spAppPoolAcctName) account for application pool..."
+        $managedAccountSearch = (Get-SPManagedAccount -Identity $global:spAppPoolAcctName -ErrorVariable err -ErrorAction SilentlyContinue)
         if ($err) {
-            $appPoolConfigPWD = (ConvertTo-SecureString $spAppPoolAcctPwd -AsPlainText -force)
-            $accountCred = New-Object System.Management.Automation.PsCredential $spAdminAcctName,$appPoolConfigPWD
+            $appPoolConfigPWD = (ConvertTo-SecureString $global:spAppPoolAcctPwd -AsPlainText -force)
+            $accountCred = New-Object System.Management.Automation.PsCredential $spAppPoolAcctName,$appPoolConfigPWD
             $managedAccountSearch = New-SPManagedAccount -Credential $accountCred
         }
-        Write-Host -ForegroundColor White "  - Creating $($searchAdminAppPoolName)..."
-        $pool = New-SPServiceApplicationPool -Name $($searchAdminAppPoolName) -Account $managedAccountSearch
+        Write-Verbose "Creating $($global:searchAdminAppPoolName)..."
+        $pool = New-SPServiceApplicationPool -Name $($global:searchAdminAppPoolName) -Account $managedAccountSearch
     }
     return $pool
 }

@@ -25,7 +25,6 @@ try {
     # Configure Logging
     SP-ConfigureDiagnosticLogging;
     # Configure services as part of minrole compliance
-    SP-ConfigureSandboxedCodeService;
     SP-CreateAccessServicesApp;
     SP-CreateAccess2010ServiceApp;
     SP-CreateExcelServiceApp;

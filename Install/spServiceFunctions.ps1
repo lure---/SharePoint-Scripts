@@ -42,7 +42,8 @@ function SP-ConfigureSandboxedCodeService {
     # Configure the sandbox code service.
     Write-Host -Foregroundcolor Green "Starting Sandboxed Code Service"
     $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
-    if ($spVer -ge 16 -and $global:serverRole -ine "Custom") {
+    $currentServer = Get-SPServer $env:COMPUTERNAME;
+    if ($spVer -ge 16 -and $currentServer.Role -ine "Custom") {
         # TODO: I should check this, seems to be the case when I deploy to "Application or WebFrontEnd"
         Write-Warning "Sandboxed Code Service supports legacy sandbox applications."
         Write-Warning "Deploying this service to non-Custom server roles wil break MinRole compliance.";
@@ -193,10 +194,10 @@ function SP-ConfigureClaimsToWindowsTokenService {
     $claimsService = $claimsServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
     if ($claimsService.Status -ne "Online") {
         try {
+            UpdateProcessIdentity -serviceToUpdate $claimsService;
             Write-Verbose "Starting $($claimsService.DisplayName)..."
             $claimsService.Provision();
             if (-not $?) {throw " Failed to start $($claimsService.DisplayName)"}
-            SetC2WTSToLocalAccount;
         }
         catch {
             Write-Output $_;
@@ -213,7 +214,7 @@ function SP-ConfigureClaimsToWindowsTokenService {
     }
     else {
         Write-Verbose "$($claimsService.DisplayName) already started."
-        SetC2WTSToLocalAccount;
+        UpdateProcessIdentity -serviceToUpdate $claimsService;
     }
     Write-Verbose "Setting C2WTS to depend on Cryptographic Services..."
     Start-Process -FilePath "$env:windir\System32\sc.exe" -ArgumentList "config c2wts depend= CryptSvc" -Wait -NoNewWindow -ErrorAction SilentlyContinue
@@ -1010,6 +1011,11 @@ function SP-CreateSubscriptionSettingsServiceApp {
 
 function SP-CreateWorkManagementServiceApp {
     Write-Host -ForegroundColor Green "Creating Workflow Management Service";
+    $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
+    if ($spVer -ge 16) {
+        Write-Warning "Work Management service not available from Sharepoint 2016";
+        return;
+    }
     # Create the work management service app.
     $serviceInstanceType = "Microsoft.Office.Server.WorkManagement.WorkManagementServiceInstance"
     CreateGenericServiceApplication `
@@ -1071,19 +1077,24 @@ function SP-CreatePowerPointConversionServiceApp {
 
 function SP-ConfigureDistributedCacheService {
     # Configure the distributed cache.
+    Write-Host -ForegroundColor Green "Starting Distributed Cache";
     # Make sure a credential deployment job doesn't already exist
     if ((!(Get-SPTimerJob -Identity "windows-service-credentials-AppFabricCachingService"))) {
         $distributedCachingSvc = (Get-SPFarm).Services | where {$_.Name -eq "AppFabricCachingService"}
-        $appPoolAcctDomain, $appPoolAcctUser = $global:spServiceAcctName -Split "\\"
-        Write-Verbose "Applying service account $($global:spServiceAcctName) to service AppFabricCachingService..."
+        # Ensure the local Distributed Cache services is actually running
+        if ($distributedCachingSvc.Status -ne "Online") {
+            Write-Verbose "Starting the Distributed Cache service."
+            Add-SPDistributedCacheServiceInstance;
+        }
         try {
-            UpdateProcessIdentity $distributedCachingSvc $global:spServiceAcctName
+            UpdateProcessIdentity $distributedCachingSvc;
         }
         catch {
             Write-Output $_
             Write-Warning "An error occurred updating the service account for service AppFabricCachingService."
         }
     }
+    Write-Host -ForegroundColor Green "Done Starting Distributed Cache";
 }
 
 function SP-CreatePWAWebApp {

@@ -15,7 +15,7 @@ function SP-ExecCommonSPServerProvisioning {
 function SP-GetFarmCredential {
     # Prompt for the farm account credentials.
     Write-Host -BackgroundColor Gray -ForegroundColor DarkBlue "Prompting for Farm Account:"
-    return $host.ui.PromptForCredential("Farm Setup", "Enter Farm Account Credentials:", "$spFarmAcctName", "NetBiosUserName" )
+    return $host.ui.PromptForCredential("Farm Setup", "Enter Farm Account Credentials:", "$:global:spFarmAcctName", "NetBiosUserName" )
 }
 
 function SP-DisableLoopback {

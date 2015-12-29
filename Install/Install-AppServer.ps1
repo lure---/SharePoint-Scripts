@@ -24,13 +24,17 @@ try {
     SP-ExecCommonSPServerProvisioning
     # Configure Logging
     SP-ConfigureDiagnosticLogging;
+    # Configure Claims to Windows Service.
+    SP-ConfigureClaimsToWindowsTokenService;
     # Go configure services (search is a separate server).
+    SP-ConfigureDistributedCacheService;
     SP-CreateStateServiceApp;
     SP-CreateMetadataServiceApp;
     SP-CreateUserProfileServiceApplication;
     SP-ConfigureUPSS;
     SP-CreateSecureStoreServiceApp;
     SP-ConfigureTracing;
+    SP-ConfigureSandboxedCodeService;
     SP-CreateBusinessDataConnectivityServiceApp;
     SP-CreateWordAutomationServiceApp;
     SP-CreateSubscriptionSettingsServiceApp;

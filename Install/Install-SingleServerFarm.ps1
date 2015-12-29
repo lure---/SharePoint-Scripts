@@ -24,39 +24,34 @@ Use-RunAs;
 try {
     # Standard provisioning steps.
     SP-ExecCommonSPServerProvisioning
-    # Create CA
-    SP-CreateCentralAdmin;
-    # Configure ULS
+    # Configure Logging
     SP-ConfigureDiagnosticLogging;
-    # Install Language Packs
-    SP-ConfigureLanguagePacks;
-    # Configure email.
-    SP-ConfigureEmail;
-    # Create default web apps.
-    SP-CreateDefaultWebApps
-    # Go configure services.
-    SP-ConfigureSandboxedCodeService;
+    # Configure Claims to Windows Service.
+    SP-ConfigureClaimsToWindowsTokenService;
+    # Go configure services (search is a separate server).
+    SP-ConfigureDistributedCacheService;
     SP-CreateStateServiceApp;
     SP-CreateMetadataServiceApp;
-    SP-ConfigureClaimsToWindowsTokenService;
     SP-CreateUserProfileServiceApplication;
-    SP-CreateSPUsageApp;
+    SP-ConfigureUPSS;
     SP-CreateSecureStoreServiceApp;
     SP-ConfigureTracing;
+    SP-ConfigureSandboxedCodeService;
     SP-CreateBusinessDataConnectivityServiceApp;
-    SP-CreateExcelServiceApp;
-    #SP-CreateAccess2010ServiceApp;
-    #SP-CreateVisioServiceApp;
-    #SP-CreatePerformancePointServiceApp;
-    #SP-CreateWordAutomationServiceApp;
+    SP-CreateWordAutomationServiceApp;
+    SP-CreateSubscriptionSettingsServiceApp;
     SP-CreateAppManagementServiceApp;
-	SP-CreateSubscriptionSettingsServiceApp;
+    SP-CreatePowerPointConversionServiceApp;
+    SP-CreateMachineTranslationServiceApp;
     SP-CreateWorkManagementServiceApp;
-    #SP-CreateMachineTranslationServiceApp;
-    #SP-CreateAccessServicesApp;
-    #SP-CreatePowerPointConversionServiceApp;
-    # Search.
-    SP-CreateEnterpriseSearchServiceApp;
+    SP-CreateSPUsageApp;
+    SP-CreateAccessServicesApp;
+    SP-CreateAccess2010ServiceApp;
+    SP-CreateExcelServiceApp;
+    SP-CreateVisioServiceApp;
+    SP-CreatePerformancePointServiceApp;
+    # Create default web apps.
+    SP-CreateDefaultWebApps
     # Post Configuration
     SP-PostInstallation;
 }

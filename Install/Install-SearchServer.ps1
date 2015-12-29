@@ -23,12 +23,10 @@ Use-RunAs;
 try {
     # Standard provisioning steps.
     SP-ExecCommonSPServerProvisioning;
-    <#
-    # Configure C2WTS.
-    SP-ConfigureClaimsToWindowsTokenService;
     # Configure ULS.
     SP-ConfigureDiagnosticLogging;
-    #>
+    # Configure Claims to Windows Service.
+    SP-ConfigureClaimsToWindowsTokenService;
     # Go configure search.
     SP-CreateEnterpriseSearchServiceApp;
     # Post Configuration
