@@ -448,7 +448,7 @@ function SP-CreateWebApp {
     }
     # See if the we have the app already
     Write-Verbose "Checking existence of web app $($url):$($port)";
-    $getSPWebApplication = Get-SPWebApplication "$($url):$($port)";
+    $getSPWebApplication = Get-SPWebApplication "$($url):$($port)" -ErrorAction SilentlyContinue;
     if ($getSPWebApplication -eq $null) {
         Write-Verbose "Creating Web App `"$webAppName`""
         $hostHeaderSwitch = @{}

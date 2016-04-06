@@ -41,9 +41,9 @@ try {
     SP-CreateAppManagementServiceApp;
     SP-CreateSPUsageApp;
     # Create default web apps.
-    #SP-CreateDefaultWebApps
+    SP-CreateDefaultWebApps
     # Post Configuration
-    #SP-PostInstallation;
+    SP-PostInstallation;
 }
 catch {
     Write-Host -ForegroundColor Red "Critial Error: " $_.Exception.Message;
