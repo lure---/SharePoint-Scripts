@@ -522,12 +522,13 @@ function SP-GrantAdminAccessToServiceApplication {
     Param($serviceApp);
     Write-Host -ForegroundColor Green "Granting Adminstrator Access to Service Application";
     try {
+        $username = "$env:USERDOMAIN\$env:USERNAME";
         $claim = New-SPClaimsPrincipal -Identity $username -IdentityType WindowsSAMAccountName;
         $serviceAppIDToSecure = Get-SPServiceApplication $($serviceApp.Id);
         $serviceAppSecurity = Get-SPServiceApplicationSecurity $serviceAppIDToSecure -Admin;
         $serviceAppPermissions = Get-SPServiceApplicationSecurity $serviceAppIDToSecure;
         # Get account principals
-        $currentUserAcctPrincipal = New-SPClaimsPrincipal -Identity $env:USERDOMAIN\$env:USERNAME -IdentityType WindowsSamAccountName
+        $currentUserAcctPrincipal = New-SPClaimsPrincipal -Identity $username -IdentityType WindowsSamAccountName
         $spServiceAcctPrincipal = New-SPClaimsPrincipal -Identity $($global:spServiceAcctName) -IdentityType WindowsSamAccountName
         $spAdminAcctPrincipal = New-SPClaimsPrincipal -Identity $($global:spAdminAcctName) -IdentityType WindowsSamAccountName
         Grant-SPObjectSecurity $serviceAppSecurity -Principal $currentUserAcctPrincipal -Rights "Full Control"
