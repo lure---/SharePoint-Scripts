@@ -297,28 +297,10 @@ function SP-CreateUserProfileServiceApplication {
             $profileServiceAppProxy  = New-SPProfileServiceApplicationProxy -Name "$userProfileServiceProxyName" -ServiceApplication $profileServiceApp -DefaultProxyGroup
             if (-not $?) { Throw "Failed to create $global:userProfileServiceName Proxy" }
         }
-
         # Grant permissions.
         Write-Verbose "Granting rights to ($global:userProfileServiceName):"
-        # Create a variable that contains the guid for the User Profile service for which you want to delegate permissions
-        $serviceAppIDToSecure = Get-SPServiceApplication $($profileServiceApp.Id);
-        # Create a variable that contains the list of administrators for the service application
-        $profileServiceAppSecurity = Get-SPServiceApplicationSecurity $serviceAppIDToSecure -Admin;
-        # Create a variable that contains the permissions for the service application
-        $profileServiceAppPermissions = Get-SPServiceApplicationSecurity $serviceAppIDToSecure;
-        # Get account principals
-        $currentUserAcctPrincipal = New-SPClaimsPrincipal -Identity $env:USERDOMAIN\$env:USERNAME -IdentityType WindowsSamAccountName
-        $spServiceAcctPrincipal = New-SPClaimsPrincipal -Identity $($global:spServiceAcctName) -IdentityType WindowsSamAccountName
-        $spAdminAcctPrincipal = New-SPClaimsPrincipal -Identity $($global:spAdminAcctName) -IdentityType WindowsSamAccountName
-        Grant-SPObjectSecurity $profileServiceAppSecurity -Principal $currentUserAcctPrincipal -Rights "Full Control"
-        Grant-SPObjectSecurity $profileServiceAppPermissions -Principal $currentUserAcctPrincipal -Rights "Full Control"
-        Grant-SPObjectSecurity $profileServiceAppPermissions -Principal $spServiceAcctPrincipal -Rights "Full Control"
-        Grant-SPObjectSecurity $profileServiceAppPermissions -Principal $spAdminAcctPrincipal -Rights "Full Control"
-        # Apply the changes to the User Profile service application
-        Set-SPServiceApplicationSecurity $serviceAppIDToSecure -objectSecurity $profileServiceAppSecurity -Admin
-        Set-SPServiceApplicationSecurity $serviceAppIDToSecure -objectSecurity $profileServiceAppPermissions
+        SP-GrantAdminAccessToServiceApplication -serviceApp $profileServiceApp;
         Write-Verbose "Done granting rights."
-
         # Add resource link to CA.
         SP-AddResourcesLink "User Profile Administration" ("_layouts/ManageUserProfileServiceApplication.aspx?ApplicationID=" +  $profileServiceApp.Id);
 
@@ -507,23 +489,26 @@ function SP-CreateSecureStoreServiceApp {
             Get-SPServiceApplication | ? {$_.GetType().Equals([Microsoft.Office.SecureStoreService.Server.SecureStoreServiceApplication])} `
             | New-SPSecureStoreServiceApplicationProxy -Name $secureStoreServiceAppProxyName -DefaultProxyGroup | Out-Null
             Write-Verbose "Done creating Secure Store Service Application."
-            # Create keys
-            $secureStore = Get-SPServiceApplicationProxy | Where {$_.GetType().Equals([Microsoft.Office.SecureStoreService.Server.SecureStoreServiceApplicationProxy])}
-            Start-Sleep 5
-            Write-Verbose "Creating the Master Key..."
-            Update-SPSecureStoreMasterKey -ServiceApplicationProxy $secureStore.Id -Passphrase $global:passphrase
-            Start-Sleep 5
-            Write-Verbose "Creating the Application Key..."
-            Update-SPSecureStoreApplicationServerKey -ServiceApplicationProxy $secureStore.Id -Passphrase $global:passphrase -ErrorAction SilentlyContinue
-            Start-Sleep 5
-            if (!$?) {
-                # Try again...
-                Write-Verbose "Creating the Application Key (2nd attempt)..."
-                Update-SPSecureStoreApplicationServerKey -ServiceApplicationProxy $secureStore.Id -Passphrase $global:passphrase
-            }
         }
         else {
             Write-Verbose "Secure Store Service Application already provisioned."
+        }
+        # Grant access to the store for the current user.
+        $secureStoreApp = Get-SPServiceApplication | ? {$_.GetType().Equals([Microsoft.Office.SecureStoreService.Server.SecureStoreServiceApplication])};
+        SP-GrantAdminAccessToServiceApplication -serviceApp $secureStoreApp;
+        # Create keys
+        $secureStore = Get-SPServiceApplicationProxy | Where {$_.GetType().Equals([Microsoft.Office.SecureStoreService.Server.SecureStoreServiceApplicationProxy])}
+        Start-Sleep 5
+        Write-Verbose "Creating the Master Key..."
+        Update-SPSecureStoreMasterKey -ServiceApplicationProxy $secureStore.Id -Passphrase $global:passphrase
+        Start-Sleep 5
+        Write-Verbose "Creating the Application Key..."
+        Update-SPSecureStoreApplicationServerKey -ServiceApplicationProxy $secureStore.Id -Passphrase $global:passphrase -ErrorAction SilentlyContinue
+        Start-Sleep 5
+        if (!$?) {
+            # Try again...
+            Write-Verbose "Creating the Application Key (2nd attempt)..."
+            Update-SPSecureStoreApplicationServerKey -ServiceApplicationProxy $secureStore.Id -Passphrase $global:passphrase
         }
     } catch {
         Write-Output $_
@@ -531,6 +516,32 @@ function SP-CreateSecureStoreServiceApp {
     }
     Write-Verbose "Done creating/configuring Secure Store Service Application.";
     Write-Host -ForegroundColor Green "Done Creating Secure Store Service";
+}
+
+function SP-GrantAdminAccessToServiceApplication {
+    Param($serviceApp);
+    Write-Host -ForegroundColor Green "Granting Adminstrator Access to Service Application";
+    try {
+        $username = "$env:USERDOMAIN\$env:USERNAME";
+        $claim = New-SPClaimsPrincipal -Identity $username -IdentityType WindowsSAMAccountName;
+        $serviceAppIDToSecure = Get-SPServiceApplication $($serviceApp.Id);
+        $serviceAppSecurity = Get-SPServiceApplicationSecurity $serviceAppIDToSecure -Admin;
+        $serviceAppPermissions = Get-SPServiceApplicationSecurity $serviceAppIDToSecure;
+        # Get account principals
+        $currentUserAcctPrincipal = New-SPClaimsPrincipal -Identity $username -IdentityType WindowsSamAccountName
+        $spServiceAcctPrincipal = New-SPClaimsPrincipal -Identity $($global:spServiceAcctName) -IdentityType WindowsSamAccountName
+        $spAdminAcctPrincipal = New-SPClaimsPrincipal -Identity $($global:spAdminAcctName) -IdentityType WindowsSamAccountName
+        Grant-SPObjectSecurity $serviceAppSecurity -Principal $currentUserAcctPrincipal -Rights "Full Control"
+        Grant-SPObjectSecurity $serviceAppPermissions -Principal $currentUserAcctPrincipal -Rights "Full Control"
+        Grant-SPObjectSecurity $serviceAppPermissions -Principal $spServiceAcctPrincipal -Rights "Full Control"
+        Grant-SPObjectSecurity $serviceAppPermissions -Principal $spAdminAcctPrincipal -Rights "Full Control"
+        Set-SPServiceApplicationSecurity $serviceAppIDToSecure -objectSecurity $serviceAppSecurity -Admin
+        Set-SPServiceApplicationSecurity $serviceAppIDToSecure -objectSecurity $serviceAppPermissions
+    } catch {
+        Write-Output $_
+        Throw "Error Granting Adminstrator Access to Service Application";
+    }
+    Write-Host -ForegroundColor Green "Done Granting Adminstrator Access to Service Application";
 }
 
 function SP-ConfigureTracing {
@@ -608,7 +619,8 @@ function SP-CreateBusinessDataConnectivityServiceApp {
             Write-Verbose "$($bdcServiceInstance.TypeName) already started."
         }
         # Create a Business Data Catalog Service Application
-        if ((Get-SPServiceApplication | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.BusinessData.SharedService.BdcServiceApplication"}) -eq $null) {
+        $bdcDataServiceApp = Get-SPServiceApplication | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.BusinessData.SharedService.BdcServiceApplication"};
+        if ($bdcDataServiceApp -eq $null) {
             # Create Service App
             Write-Verbose "Creating $global:bdcAppName..."
             $bdcDataServiceApp = New-SPBusinessDataCatalogServiceApplication -Name $global:bdcAppName -ApplicationPool $applicationPool -DatabaseServer $global:dbServer -DatabaseName $bdcDataDB
@@ -621,6 +633,9 @@ function SP-CreateBusinessDataConnectivityServiceApp {
         Write-Output $_
         Throw "Error provisioning Business Data Connectivity application"
     }
+    # Grant rights.
+    SP-GrantAdminAccessToServiceApplication -serviceApp $bdcDataServiceApp;
+
     Write-Host -ForegroundColor Green "Done Creating BCS Service App.";
 }
 

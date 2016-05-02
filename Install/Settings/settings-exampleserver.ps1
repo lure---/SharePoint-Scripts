@@ -14,7 +14,7 @@ $global:passphrase = "MyPassPhrase";
 $global:CAportNumber = 2016;
 
 # Accounts.
-$:global:spFarmAcctName = "DOMAIN\spfarm";
+$global:spFarmAcctName = "DOMAIN\spfarm";
 $global:spAdminAcctName = "DOMAIN\spadmin";
 $global:spServiceAcctName = "DOMAIN\spservice";
 $global:spServiceAcctPwd = "mypassword";

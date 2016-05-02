@@ -73,12 +73,12 @@ function SP-CreateOrJoinFarm {
         else {
             $farmMessage = "Done joining farm."
         }
-        # Configure new or existing farm
-        SP-ConfigureFarm;
     }
     else {
         $farmMessage = "$env:COMPUTERNAME is already joined to farm on `"$configDB`"."
     }
+    # Configure new or existing farm
+    SP-ConfigureFarm;
     Write-Verbose $farmMessage;
     Write-Host -Foregroundcolor Green "Done Creating or Joining Server Farm";
 }
@@ -347,18 +347,18 @@ function SP-ConfigureLanguagePacks {
 
 function SP-RegisterManagedAccount {
     param($username, $password);
-    $password = ConvertTo-SecureString "$password" -AsPlaintext -Force
+    $secPassword = ConvertTo-SecureString "$password" -AsPlaintext -Force
     $alreadyAdmin = $false
     # The following was suggested by Matthias Einig (http://www.codeplex.com/site/users/view/matein78)
     # And inspired by http://todd-carter.com/post/2010/05/03/Give-your-Application-Pool-Accounts-A-Profile.aspx & 
     # http://blog.brainlitter.com/archive/2010/06/08/how-to-revolve-event-id-1511-windows-cannot-find-the-local-profile-on-windows-server-2008.aspx
     try {
-        $credAccount = New-Object System.Management.Automation.PsCredential $username,$password
+        $credAccount = New-Object System.Management.Automation.PsCredential $username,$secPassword
         $managedAccountDomain,$managedAccountUser = $username -Split "\\"
         Write-Verbose "Account `"$managedAccountDomain\$managedAccountUser`:"
-        Write-Verbose "Creating local profile for $username..."
+        Write-Verbose "Creating local profile for $username...";
         # Add managed account to local admins (very) temporarily so it can log in and create its profile
-        if (!($localAdmins -contains $managedAccountUser)) {
+        if (!($global:localAdmins -contains $managedAccountUser)) {
             $builtinAdminGroup = Get-AdministratorsGroup
             ([ADSI]"WinNT://$env:COMPUTERNAME/$builtinAdminGroup,group").Add("WinNT://$managedAccountDomain/$managedAccountUser")
         }
@@ -391,7 +391,7 @@ function SP-RegisterManagedAccount {
             $credAccount = $host.ui.PromptForCredential("Managed Account", "Enter Account Credentials:", "", "NetBiosUserName" )
         }
         else {
-            $credAccount = New-Object System.Management.Automation.PsCredential $username,$password
+            $credAccount = New-Object System.Management.Automation.PsCredential $username,$secPassword
         }
         New-SPManagedAccount -Credential $credAccount | Out-Null
         if (-not $?) { Throw "Failed to create managed account" }
@@ -448,7 +448,7 @@ function SP-CreateWebApp {
     }
     # See if the we have the app already
     Write-Verbose "Checking existence of web app $($url):$($port)";
-    $getSPWebApplication = Get-SPWebApplication "$($url):$($port)";
+    $getSPWebApplication = Get-SPWebApplication "$($url):$($port)" -ErrorAction SilentlyContinue;
     if ($getSPWebApplication -eq $null) {
         Write-Verbose "Creating Web App `"$webAppName`""
         $hostHeaderSwitch = @{}
