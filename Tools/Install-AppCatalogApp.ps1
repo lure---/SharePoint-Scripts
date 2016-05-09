@@ -31,48 +31,6 @@ $json | ? { $_.Catalog -eq 1 } | % {
         $ccaCtor = $ccaType.GetConstructors($flags) | ? { $_.GetParameters().Count -eq 1; }
         $cca = $ccaCtor.Invoke(@($web));
     
-        <#
-        Write-Verbose "Getting app details for app ID $appId";
-        $method = $ccaType.GetMethod("GetAppDetails", $flags);
-        $deets = $method.Invoke($cca, $appId);
-
-        Write-Verbose "Getting permissions XML for app with ID $appId";
-        $appType = $asm.GetType("Microsoft.SharePoint.Administration.SPAppPermissionProvider");
-        $method = $appType.GetMethod("ValidateAppPermissionRequestsAndExtractAppInfo", [System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Static);
-        $validApp = $method.Invoke($null, $deets.BasicDetails.PermissionsXML);
-        $appPrincipalId = $validApp.AppPrincipal;
-        Write-Host -ForegroundColor Yellow "App Principal ID from permissions: $appPrincipalId";
-    
-        Write-Verbose "Getting instance of Marketplace App Principal Manager";
-        $mapmType = $asm.GetType("Microsoft.SharePoint.Administration.SPMarketplaceAppPrincipalManager")    
-        $method = $mapmType.GetMethod("GetManager", [System.Reflection.BindingFlags]::Public -bor [System.Reflection.BindingFlags]::Static);
-        $manager = $method.Invoke($null, $web);
-
-        Write-Verbose "Creating App Registration Admin";
-        $araType = $asm.GetType("Microsoft.SharePoint.AppRegistrationAdmin");
-        $araCtor = $araType.GetConstructors()[0];
-        $ara = $araCtor.Invoke(@($web));
-    
-        Write-Verbose "See if app was added to web";
-        $method = $araType.GetMethod("GetAppInfo", $flags);
-        $appPrincipalInfo = $method.Invoke($ara, @($appPrincipalId, $false));
-    
-        if ($appPrincipalInfo -eq $null) {
-            Write-Verbose "Getting app principal from the app principal ID";
-            $method = $manager.GetType().GetMethod("LookupAppPrincipalOrCreateUsingMarketplaceData");
-            [Microsoft.SharePoint.SPAppPrincipal]$appPrincipal = $method.Invoke($manager, $appPrincipalId);
-            $property = $appPrincipal.GetType().GetProperty("AppPrincipalInfo", $flags);
-            $appPrincipalInfo = $property.GetValue($appPrincipal);
-        }
-    
-        Write-Verbose "Getting instance of App Principal Permissions Manager";
-        Write-Verbose "Setting app only policy to true";
-        $appm = New-Object Microsoft.SharePoint.SPAppPrincipalPermissionsManager($web);
-        $method = $appm.GetType().GetMethod("UpdateAppOnlyPolicy", $flags);
-        $method.Invoke($appm, @($appPrincipalInfo, $true));
-        Write-Host -ForegroundColor Yellow "App principal name: $($appPrincipalInfo.Name)";
-        #>
-
         Write-Verbose "Getting App Package from the Catalog";
         $method = $ccaType.GetMethods($flags) | ? { $_.Name -ilike "GetAppPackage" -and ($_.GetParameters())[0].ParameterType.Name -eq "String" } 
         $stream = $method.Invoke($cca, @($appId));
