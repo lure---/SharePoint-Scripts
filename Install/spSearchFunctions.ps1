@@ -128,8 +128,9 @@ function SP-CreateEnterpriseSearchServiceApp {
     }
 
     # Update the default Content Access Account
+    Write-Verbose "$global:spSearchCrawlAcctName $global:spSearchCrawlAcctPWD"
     $pwd = ConvertTo-SecureString $global:spSearchCrawlAcctPWD -AsPlaintext -Force
-    Update-SearchContentAccessAccount $($global:searchAppName) $searchApp $($global:spSearchCrawlAcctName) $pwd
+    Update-SearchContentAccessAccount -saName $($global:searchAppName) -sa $searchApp -caa $global:spSearchCrawlAcctName -caapwd $pwd;
 
     # If the index location isn't already set to either the default location or our custom-specified location, set the default location for the search service instance
     if ($global:indexLocation -ne $searchSvc.DefaultIndexLocation) {
