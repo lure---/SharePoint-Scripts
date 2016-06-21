@@ -44,8 +44,7 @@ function ExecuteQueryWithIncrementalRetry {
         } catch [System.Net.WebException] {
             [System.Net.WebException]$wex = $_.Exception;
             [System.Net.HttpWebResponse]$response = $wex.Response;
-            if ($response -ne $null -and ($response.StatusCode -eq ([System.Net.HttpStatusCode]429) -or `
-                $response.StatusCode -eq ([System.Net.HttpStatusCode]503))) {
+            if ($response -ne $null -and ($response.StatusCode -eq 429 -or $response.StatusCode -eq 503)) {
                 Write-Verbose "Request to SPO timed out, so waiting $backoffInterval millisecnds and trying again"; 
                 [System.Threading.Thread]::Sleep($backoffInterval);
                 $retryAttempts++;
@@ -280,8 +279,7 @@ function Process-File {
         } catch [System.Net.WebException] {
             [System.Net.WebException]$wex = $_.Exception;
             [System.Net.HttpWebResponse]$response = $wex.Response;
-            if ($response -ne $null -and ($response.StatusCode -eq ([System.Net.HttpStatusCode]429) -or `
-                $response.StatusCode -eq ([System.Net.HttpStatusCode]503))) {
+            if ($response -ne $null -and ($response.StatusCode -eq 429 -or $response.StatusCode -eq 503)) {
                 Write-Verbose "Request to SPO timed out, so waiting $backoffInterval millisecnds and trying again"; 
                 [System.Threading.Thread]::Sleep($backoffInterval);
                 $retryAttempts++;
