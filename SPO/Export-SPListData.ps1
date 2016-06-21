@@ -11,7 +11,7 @@
     
 
 [CmdletBinding()]Param(
-    [Parameter(Mandatory=$false)][string]$siteUrl,
+    [Parameter(Mandatory=$true)][string]$siteUrl,
     [Parameter(Mandatory=$false)][PSCredential]$credentials,
     [Parameter(Mandatory=$false)][string]$action,
     [Parameter(Mandatory=$false)][string]$listName,
@@ -32,6 +32,31 @@ $global:systemFieldNames = @(
 
 $0 = $myInvocation.MyCommand.Definition
 $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
+
+function ExecuteQueryWithIncrementalRetry {
+    param([Parameter(Mandatory=$true)][Microsoft.SharePoint.Client.ClientContext]$clientContext);
+    $retryAttempts = 0;
+    $backoffInterval = 10000; # Milliseconds
+    while ($retryAttempts -lt 5) {
+        try {
+            $clientContext.ExecuteQuery();
+            return;
+        } catch [System.Net.WebException] {
+            [System.Net.WebException]$wex = $_.Exception;
+            [System.Net.HttpWebResponse]$response = $wex.Response;
+            if ($response -ne $null -and ($response.StatusCode -eq ([System.Net.HttpStatusCode]429) -or `
+                $response.StatusCode -eq ([System.Net.HttpStatusCode]503))) {
+                Write-Verbose "Request to SPO timed out, so waiting $backoffInterval millisecnds and trying again"; 
+                [System.Threading.Thread]::Sleep($backoffInterval);
+                $retryAttempts++;
+                $backoffInterval *= 2;
+            } else {
+                throw;
+            }
+        }
+    }
+    throw "Maximum retry attempts exceeded";
+}
 
 function CheckAction {
     if ([string]::IsNullOrEmpty($action)) { Usage; Exit 0; }
@@ -62,7 +87,7 @@ function Process-SPWeb {
     );
     $clientContext.Load($clientContext.Site);
     $clientContext.Load($clientContext.Web);
-    $clientContext.ExecuteQuery();
+    ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
     Write-Verbose "Loaded Site Collection $($clientContext.Site.Url)";
     Write-Verbose "Loaded Site $($clientContext.Web.Url)";
     & $s -site $clientContext.Site -web $clientContext.Web;
@@ -78,7 +103,7 @@ function Enumerate {
         Write-Verbose "Iterating Lists and Libraries";
         $lists = $web.Lists;
         $clientContext.Load($lists);
-        $clientContext.ExecuteQuery();
+        ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
         Write-Host -ForegroundColor Black -BackgroundColor Yellow `
             "Note: Item counts reflect draft items and items in the recycle bin, true count determined when processing export";
         $lists | % {
@@ -114,12 +139,12 @@ function Export {
         Write-Verbose "Looking up list $listName";
         $lists = $web.Lists;
         $clientContext.Load($lists);
-        $clientContext.ExecuteQuery();
+        ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
         [Microsoft.SharePoint.Client.List]$list = $lists | ? { $_.Title -ieq $listName; }
         if ($list -eq $null) { throw "Failed to find list with name $listName"; }
         $clientContext.Load($list);
         $clientContext.Load($list.Fields);
-        $clientContext.ExecuteQuery();
+        ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
         Write-Verbose "List $($list.Title) loaded";
         # Get destination folder.
         Write-Host -ForegroundColor Yellow "Beginning export process";
@@ -161,7 +186,7 @@ function Process-List {
         if ($position -ne $null) { $query.ListItemCollectionPosition = $position; }
         $listItems = $list.GetItems($query);
         $clientContext.Load($listItems);
-        $clientContext.ExecuteQuery();
+        ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
         # Export the items.
         $counterEnd = ($counter + $listItems.Count) - 1;
         Write-Host -ForegroundColor Yellow "Exporting list items batch ($counter - $counterEnd)";
@@ -171,7 +196,7 @@ function Process-List {
                 $clientContext.Load($item);
                 $clientContext.Load($item.ContentType);
                 $clientContext.Load($item.Folder);
-                $clientContext.ExecuteQuery();
+                ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
                 if ($item.ContentType.Name -ne "Folder") {
                     Write-Verbose "Getting attachments folder for list item with id $($item.Id)";
                     $rootFolderUrl = $clientContext.Web.ServerRelativeUrl + "/Lists/" + $list.Title;
@@ -182,7 +207,7 @@ function Process-List {
                     $clientContext.Load($folder);
                     $clientContext.Load($folder.Folders);
                     $clientContext.Load($folder.Files);
-                    $clientContext.ExecuteQuery();
+                    ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
                     Process-Folder -clientContext $clientContext -folder $folder -path ($path + $subFolderUrl);
                 } 
             } catch {
@@ -204,7 +229,7 @@ function Process-DocLib {
     $clientContext.Load($list.RootFolder);
     $clientContext.Load($list.RootFolder.Folders);
     $clientContext.Load($list.RootFolder.Files);
-    $clientContext.ExecuteQuery();
+    ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
     Process-Folder -clientContext $clientContext -folder $list.RootFolder -path $path;
 }
 
@@ -219,25 +244,54 @@ function Process-Folder {
     # Iterate the files
     $folder.Files | % {
         try {
-            $fullPath = $path + "\"+ $_.Name;
-            $fileRef = $_.ServerRelativeUrl;
+            Process-File -clientContext $clientContext -file $_ -path $path;
+        } catch {
+            Write-Host -ForegroundColor Red "Skipped $fullPath due to error $($_.Exception.Message)";
+        }
+    }
+    # Sub folders.
+    $folder.Folders | % {
+        $clientContext.Load($_);
+        $clientContext.Load($_.Folders);
+        $clientContext.Load($_.Files);
+        ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
+        Process-Folder -clientContext $clientContext -folder $_ -path ($path + "\" + $_.Name);
+    }
+}
+
+function Process-File {
+    param(
+        [Parameter(Mandatory=$true)][Microsoft.SharePoint.Client.ClientContext]$clientContext,
+        [Parameter(Mandatory=$true)][Microsoft.SharePoint.Client.File]$file,
+        [Parameter(Mandatory=$true)][string]$path 
+    ); 
+    $retryAttempts = 0;
+    $backoffInterval = 10000; # Milliseconds
+    while ($retryAttempts -lt 5) {
+        try {
+            $fullPath = $path + "\"+ $file.Name;
+            $fileRef = $file.ServerRelativeUrl;
             [Microsoft.SharePoint.Client.FileInformation]$fileInfo = [Microsoft.SharePoint.Client.File]::OpenBinaryDirect($clientContext, $fileRef);
             $fs = [System.IO.File]::Create($fullPath);
             $fileInfo.Stream.CopyTo($fs);
             $fs.Close();
             Write-Host -ForegroundColor Yellow "Exported $fullPath";
-        } catch {
-            Write-Host -ForegroundColor Red "Skipped $fullPath due to error $($_.Exception.Message)";
+            return;
+        } catch [System.Net.WebException] {
+            [System.Net.WebException]$wex = $_.Exception;
+            [System.Net.HttpWebResponse]$response = $wex.Response;
+            if ($response -ne $null -and ($response.StatusCode -eq ([System.Net.HttpStatusCode]429) -or `
+                $response.StatusCode -eq ([System.Net.HttpStatusCode]503))) {
+                Write-Verbose "Request to SPO timed out, so waiting $backoffInterval millisecnds and trying again"; 
+                [System.Threading.Thread]::Sleep($backoffInterval);
+                $retryAttempts++;
+                $backoffInterval *= 2;
+            } else {
+                throw;
+            }
         }
     }
-# Sub folders.
-    $folder.Folders | % {
-        $clientContext.Load($_);
-        $clientContext.Load($_.Folders);
-        $clientContext.Load($_.Files);
-        $clientContext.ExecuteQuery();
-        Process-Folder -clientContext $clientContext -folder $_ -path ($path + "\" + $_.Name);
-    }
+    throw "Maximum retry attempts exceeded";
 }
 
 try {
