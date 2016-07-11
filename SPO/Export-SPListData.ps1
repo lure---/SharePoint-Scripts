@@ -236,9 +236,7 @@ function Process-List {
             try {
                 $item = $_;
                 $clientContext.Load($item);
-                $clientContext.Load($item.FieldValuesAsText);
                 $clientContext.Load($item.ContentType);
-                $clientContext.Load($item.AttachmentFiles);
                 ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
                 if ($item.ContentType.Name -ne "Folder") {
                     Write-Verbose "Getting attachments folder for list item with id $($item.Id)";
@@ -247,18 +245,15 @@ function Process-List {
                     } else {
                         $rootFolderUrl = $clientContext.Web.ServerRelativeUrl + "/Lists/" + $list.Title;
                     }
-                    if ($item.AttachmentFiles -ne $null) {
-                        $folderUrl = $item["FileDirRef"].ToString();
-                        $subFolderUrl = $folderUrl.Substring($rootFolderUrl.Length);
-                        $subFolderPath = $subFolderUrl.Replace("/", "\");
-                        $relUrl = $clientContext.Site.Url + "/Lists/" + $list.Title + "/Attachments/" + $item.Id;
-                        $folder = $list.ParentWeb.GetFolderByServerRelativeUrl($relUrl);
-                        $clientContext.Load($folder);
-                        $clientContext.Load($folder.Folders);
-                        $clientContext.Load($folder.Files);
-                        ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
-                        Process-Folder -clientContext $clientContext -folder $folder -path ($path + "\" + $item.ID);
-                    }
+                    $folderUrl = $item["FileDirRef"].ToString();
+                    $subFolderUrl = $folderUrl.Substring($rootFolderUrl.Length);
+                    $subFolderPath = $subFolderUrl.Replace("/", "\");
+                    $relUrl = $clientContext.Site.Url + "/Lists/" + $list.Title + "/Attachments/" + $item.Id;
+                    $folder = $list.ParentWeb.GetFolderByServerRelativeUrl($relUrl);
+                    $clientContext.Load($folder);
+                    $clientContext.Load($folder.Files);
+                    ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
+                    Process-Folder -clientContext $clientContext -folder $folder -path ($path + "\" + $item.ID) -IgnoreFolders $true;
                 } 
             } catch {
                 Write-Host -ForegroundColor Red "Unable to get attachments for list item with id $($item.Id) $($_.Exception)";
@@ -287,7 +282,8 @@ function Process-Folder {
     param(
         [Parameter(Mandatory=$true)][Microsoft.SharePoint.Client.ClientContext]$clientContext,
         [Parameter(Mandatory=$true)][Microsoft.SharePoint.Client.Folder]$folder,
-        [Parameter(Mandatory=$true)][string]$path 
+        [Parameter(Mandatory=$true)][string]$path,
+        [Parameter(Mandatory=$false)][bool]$IgnoreFolders = $false
     ); 
     if ($folder.Name -ieq "Forms") { return; }
     Write-Verbose "Iterating folder $($folder.Name), dumping to $path";
@@ -300,13 +296,15 @@ function Process-Folder {
             Write-Host -ForegroundColor Red "Skipped $fullPath due to error $($_.Exception.Message)";
         }
     }
-    # Sub folders.
-    $folder.Folders | % {
-        $clientContext.Load($_);
-        $clientContext.Load($_.Folders);
-        $clientContext.Load($_.Files);
-        ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
-        Process-Folder -clientContext $clientContext -folder $_ -path ($path + "\" + $_.Name);
+    if (!$IgnoreFolders) {
+        # Sub folders.
+        $folder.Folders | % {
+            $clientContext.Load($_);
+            $clientContext.Load($_.Folders);
+            $clientContext.Load($_.Files);
+            ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
+            Process-Folder -clientContext $clientContext -folder $_ -path ($path + "\" + $_.Name);
+        }
     }
 }
 
