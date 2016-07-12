@@ -236,9 +236,10 @@ function Process-List {
             try {
                 $item = $_;
                 $clientContext.Load($item);
+                $clientContext.Load($item.AttachmentFiles);
                 $clientContext.Load($item.ContentType);
                 ExecuteQueryWithIncrementalRetry -clientContext $clientContext;
-                if ($item.ContentType.Name -ne "Folder") {
+                if ($item.ContentType.Name -ne "Folder" -and $item.AttachmentFiles.Count -gt 0) {
                     Write-Verbose "Getting attachments folder for list item with id $($item.Id)";
                     if ($clientContext.Web.ServerRelativeUrl.EndsWith("/")) {
                         $rootFolderUrl = $clientContext.Web.ServerRelativeUrl + "Lists/" + $list.Title;
