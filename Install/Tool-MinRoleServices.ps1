@@ -2,8 +2,7 @@
 # Determine MinRole Services
 # http://blog.sharedove.com/adisjugo/index.php/2015/12/10/minroles-under-the-hood/
 
-[CmdletBinding()]
-param()
+[CmdletBinding()]param()
 
 $0 = $myInvocation.MyCommand.Definition
 $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
