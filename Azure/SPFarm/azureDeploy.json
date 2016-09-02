@@ -1,0 +1,280 @@
+// Azure Deployment Template
+// Create SharePoint 2013 Farm
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"dnsNameforLBSharePoint": {
+			"type": "string",
+			"defaultValue": "[concat('sp-', toLower(replace(resourceGroup().name, ' ', '')), '-robgarrettlab')]",
+			"metadata": {
+				"description": "Public DNS name for SharePoint farm"
+			}
+		},
+		"dnsNameforSharePointCA": {
+			"type": "string",
+			"defaultValue": "[concat('ca-', toLower(replace(resourceGroup().name, ' ', '')), '-robgarrettlab')]",
+			"metadata": {
+				"description": "Public DNS name for SharePoint Central Admin"
+			}
+		},
+		"staticSubnet": {
+			"type": "string",
+			"defaultValue": "10.0.0.0/24",
+			"metadata": {
+				"description": "Static Subnet Address"
+			}
+		},
+		"sqlSubnet": {
+			"type": "string",
+			"defaultValue": "10.0.1.0/24",
+			"metadata": {
+				"description": "SQL Subnet Address"
+			}
+		},
+		"spWebSubnet": {
+			"type": "string",
+			"defaultValue": "10.0.2.0/24",
+			"metadata": {
+				"description": "SP Web Subnet Address"
+			}
+		},
+		"spAppSubnet": {
+			"type": "string",
+			"defaultValue": "10.0.3.0/24",
+			"metadata": {
+				"description": "SP App Subnet Address"
+			}
+		},
+		"vnetAddressPrefix": {
+			"type": "string",
+			"defaultValue": "10.0.0.0/16",
+			"metadata": {
+				"description": "VNET Address Prefix"
+			}
+		}
+	},
+	"variables": {
+		// Build variables based on the resource name.
+		"commonID": "[toLower(replace(resourceGroup().name, ' ', ''))]",
+		"storageAccount": {
+			"storageAccountName": "[concat(variables('commonID'), 'storage')]"
+		},
+		"Availability": {
+			"AD": "[concat(variables('commonID'), '-adAvailability')]",
+			"SPWEB": "[concat(variables('commonID'), '-spWebAvailability')]",
+			"SPAPPS": "[concat(variables('commonID'), '-spAppsAvailability')]",
+			"SQL": "[concat(variables('commonID'), '-sqlAvailability')]"
+		},
+		"LoadBalancers": {
+			"SPWEB": {
+				"publicIPAddressName": "[concat(variables('commonID'), '-sppip')]",
+				"loadBalancerFrontEnd": "[concat(variables('commonID'), '-splbfe')]",
+				"loadBalancerBackEndPool": "[concat(variables('commonID'), '-splbbep')]",
+				"lbName": "[concat(variables('commonID'), '-spLB')]"
+				
+			},
+			"CA": {
+				// Public Load Balancer for Central Admin
+				"publicIPAddressName": "[concat(variables('commonID'), '-capip')]",
+				"loadBalancerFrontEnd": "[concat(variables('commonID'), '-calbfe')]",
+				"loadBalancerBackEndPool": "[concat(variables('commonID'), '-calbbep')]",
+				"lbName": "[concat(variables('commonID'), '-caLB')]"
+			},
+			"SPAPPS": {
+				// Internal Load Balancer for App Servers
+				"loadBalancerFrontEnd": "[concat(variables('commonID'), '-spappslbfe')]",
+				"loadBalancerBackEndPool": "[concat(variables('commonID'), '-spappslbbep')]",
+				"lbName": "[concat(variables('commonID'), '-spappsLB')]"
+			},
+			"RDP": {
+				// Public Load Balancer for NAT of RDP
+				"publicIPAddressName": "[concat(variables('commonID'), '-rdppip')]",
+				"loadBalancerFrontEnd": "[concat(variables('commonID'), '-lbfe')]",
+				"loadBalancerBackEndPool": "[concat(variables('commonID'), '-lbbep')]",
+				"lbName": "[concat(variables('commonID'), '-rdpLB')]",
+				"NATName": "[concat(variables('commonID'), '-rdpNAT')]"
+			}
+		},
+		"Networking": {
+			"vnetName": "[concat(variables('commonID'), '-vnet')]",
+			"subnetNames": {
+				"staticSubnetName": "[concat(variables('commonID'), '-staticSubnet')]",
+				"sqlSubnetName": "[concat(variables('commonID'), '-sqlSubnet')]",
+				"spWebSubnetName": "[concat(variables('commonID'), '-spWebSubnet')]",
+				"spAppSubnetName": "[concat(variables('commonID'), '-spAppSubnet')]"
+			},
+			"subnets": {
+				"staticSubnet": "[parameters('staticSubNet')]",
+				"sqlSubnet": "[parameters('sqlSubNet')]",
+				"spWebSubnet": "[parameters('spWebSubNet')]",
+				"spAppSubnet": "[parameters('spAppSubNet')]"
+			}
+		}
+	},
+	"resources": [
+		// Storage Account
+		{
+			"type": "Microsoft.Storage/storageAccounts",
+			"name": "[variables('storageAccount').storageAccountName]",
+			"apiVersion": "2015-06-15",
+			"location": "[resourceGroup().location]",
+			"properties": {
+				"accountType": "Standard_LRS"
+			}
+		},
+		// Public IP Addresses
+		/// RDP
+		{
+			"apiVersion": "2015-06-15",
+			"type": "Microsoft.Network/publicIPAddresses",
+			"name": "[variables('LoadBalancers').RDP.publicIPAddressName]",
+			"location": "[resourceGroup().location]",
+			"properties": {
+				"publicIPAllocationMethod": "Dynamic"
+			}
+		},
+		/// SharePoint Web Load Balancer
+		{
+			"apiVersion": "2015-06-15",
+			"type": "Microsoft.Network/publicIPAddresses",
+			"name": "[variables('LoadBalancers').SPWEB.publicIPAddressName]",
+			"location": "[resourceGroup().location]",
+			"properties": {
+				"publicIPAllocationMethod": "Dynamic",
+				"dnsSettings": {
+					"domainNameLabel": "[parameters('dnsNameforLBSharePoint')]"
+				}
+			}
+		},
+		//// Central Admin Load Balancer
+		{
+			"apiVersion": "2015-06-15",
+			"type": "Microsoft.Network/publicIPAddresses",
+			"name": "[variables('LoadBalancers').CA.publicIPAddressName]",
+			"location": "[resourceGroup().location]",
+			"properties": {
+				"publicIPAllocationMethod": "Dynamic",
+				"dnsSettings": {
+					"domainNameLabel": "[parameters('dnsNameforSharePointCA')]"
+				}
+			}
+		},
+		// Load Balancers
+		//// RDP
+		{
+			"apiVersion": "2015-06-15",
+			"name": "[variables('LoadBalancers').RDP.lbName]",
+			"type": "Microsoft.Network/loadBalancers",
+			"location": "[resourceGroup().location]",
+			"dependsOn": [
+				"[concat('Microsoft.Network/publicIPAddresses/', variables('LoadBalancers').RDP.publicIPAddressName)]"
+			],
+			"properties": {
+				"frontendIPConfigurations": [
+					{
+						"name": "[variables('LoadBalancers').RDP.loadBalancerFrontEnd]",
+						"properties": {
+							"publicIPAddress": {
+								"id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('LoadBalancers').RDP.publicIPAddressName)]"
+							}
+						}
+					}
+				],
+				"backendAddressPools": [
+					{
+						"name": "[variables('LoadBalancers').RDP.loadBalancerBackEndPool]"
+					}
+				],
+				"inboundNatRules": [
+					{
+						"name": "[variables('LoadBalancers').RDP.NATName]",
+						"properties": {
+							"frontendIPConfiguration": {
+								"id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('LoadBalancers').RDP.lbName),'/frontendIPConfigurations/',variables('LoadBalancers').RDP.loadBalancerFrontEnd)]"
+							},
+							"protocol": "tcp",
+							"frontendPort": 3389,
+							"backendPort": 3389,
+							"enableFloatingIP": false
+						}
+					}
+				]
+			}
+		},
+		// Availability Sets
+		{
+			"type": "Microsoft.Compute/availabilitySets",
+			"name": "[variables('Availability').AD]",
+			"apiVersion": "2015-06-15",
+			"location": "[resourceGroup().location]",
+			"properties": {}
+		},
+		{
+			"type": "Microsoft.Compute/availabilitySets",
+			"name": "[variables('Availability').SQL]",
+			"apiVersion": "2015-06-15",
+			"location": "[resourceGroup().location]",
+			"properties": {}
+		},
+		{
+			"type": "Microsoft.Compute/availabilitySets",
+			"name": "[variables('Availability').SPWEB]",
+			"apiVersion": "2015-06-15",
+			"location": "[resourceGroup().location]",
+			"properties": {}
+		},
+		{
+			"type": "Microsoft.Compute/availabilitySets",
+			"name": "[variables('Availability').SPAPPS]",
+			"apiVersion": "2015-06-15",
+			"location": "[resourceGroup().location]",
+			"properties": {}
+		},
+		// Virtual Network and Subnets
+		{
+			"apiVersion": "2015-06-15",
+			"type": "Microsoft.Network/virtualNetworks",
+			"name": "[variables('Networking').vnetName]",
+			"location": "[resourceGroup().location]",
+			"properties": {
+				"addressSpace": {
+					"addressPrefixes": [
+						"[parameters('vnetAddressPrefix')]"
+					]
+				},
+				"subnets": [
+					// Static Subnet
+					{
+						"name": "[variables('Networking').subnetNames.staticSubnetName]",
+						"properties": {
+							"addressPrefix": "[variables('Networking').subnets.staticSubnet]"
+						}
+					},
+					// SQL Subnet
+					{
+						"name": "[variables('Networking').subnetNames.sqlSubnetName]",
+						"properties": {
+							"addressPrefix": "[variables('Networking').subnets.sqlSubnet]"
+						}
+					},
+					// SPWeb Subnet
+					{
+						"name": "[variables('Networking').subnetNames.spWebSubnetName]",
+						"properties": {
+							"addressPrefix": "[variables('Networking').subnets.spWebSubnet]"
+						}
+					},
+					// SPApp Subnet
+					{
+						"name": "[variables('Networking').subnetNames.spAppSubnetName]",
+						"properties": {
+							"addressPrefix": "[variables('Networking').subnets.spAppSubnet]"
+						}
+					}
+				]
+			}
+		}
+	],
+	"outputs": {}
+}

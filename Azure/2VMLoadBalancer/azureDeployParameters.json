@@ -1,0 +1,37 @@
+// Parameters for the Azure Deployment.
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageAccountName": {
+      "value": "2vmlbstorage"
+    },
+	"availabilitySetName": {
+		"value": "2vmlnavailset"
+	},
+	"adminUsername": {
+		"value": "rgarrett"
+	},
+	"adminPassword": {
+		"value": "pa$$w0rd1"
+	},
+	"dnsNameforLBIP": {
+		"value": "robgarrettlab"
+	},
+	"vmNamePrefix": {
+		"value": "LABVM"
+	},
+	"lbName": {
+		"value": "2vmlblb"
+	},
+	"nicNamePrefix": {
+		"value": "VMNic"
+	},
+	"publicIPAddressName": {
+		"value": "2vmlbpip"
+	},
+	"vnetName": {
+		"value": "LAB-VNET"
+	}
+  }
+}
