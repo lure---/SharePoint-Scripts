@@ -7,12 +7,12 @@
 # June 21, 2016.
 #
 # Requirements:
-#    SharePoint Online Client Components SDK (64-bit) (https://www.microsoft.com/en-us/download/details.aspx?id=42038) 
+#    SharePoint CSOM Redistributables.
+#    Uses credentials of the current logged on user.
     
 
 [CmdletBinding()]Param(
     [Parameter(Mandatory=$true)][string]$siteUrl,
-    [Parameter(Mandatory=$false)][PSCredential]$credentials,
     [Parameter(Mandatory=$false)][string]$action,
     [Parameter(Mandatory=$false)][string]$listName,
     [Parameter(Mandatory=$false)][string]$path
@@ -349,11 +349,8 @@ try {
     [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime") | Out-Null;
     Write-Verbose "Checking action";
     $actionBlock = CheckAction; 
-    Write-Verbose "Connecting to SPO and site collection $siteUrl";
-    if ($credentials -eq $null) { $credentials = Get-Credential; }
-    $spoCred = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials $credentials.UserName, $credentials.Password;
-    $clientContext = New-Object Microsoft.SharePoint.Client.ClientContext $siteUrl
-    $clientContext.Credentials = $spoCred;
+    Write-Verbose "Connecting to site collection $siteUrl";
+    $clientContext = New-Object Microsoft.SharePoint.Client.ClientContext $siteUrl;
     Write-Host -ForegroundColor Yellow "Connected to $siteUrl";
     & $actionBlock;
 

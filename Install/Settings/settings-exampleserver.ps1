@@ -37,7 +37,7 @@ $global:fromEmailAddress = "no-reply@myserver.com";
 # Location for search indexes.
 $global:indexLocation = "c:\SPIndex";
 # Array of servers with query components.
-$global:queryServers = ($env:COMPUTERNAME);
+$global:queryServers = @($env:COMPUTERNAME);
 # Array of servrs with crawl components.
-$global:crawlServers = ($env:COMPUTERNAME);
+$global:crawlServers = @($env:COMPUTERNAME);
 

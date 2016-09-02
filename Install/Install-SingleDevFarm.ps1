@@ -3,8 +3,7 @@
 # Rob Garrett
 # With the help from http://autospinstaller.codeplex.com/
 
-[CmdletBinding()]
-param ([bool]$localExec = $true)
+[CmdletBinding()]param()
 
 $0 = $myInvocation.MyCommand.Definition
 $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
