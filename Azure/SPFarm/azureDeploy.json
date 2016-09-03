@@ -18,6 +18,13 @@
 				"description": "Public DNS name for SharePoint Central Admin"
 			}
 		},
+		"sqlLBStaticIP": {
+			"type": "string",
+			"defaultValue": "10.0.0.100",
+			"metadata": {
+				"description": "Static IP Address for SQL load balancer"
+			}
+		},
 		"staticSubnet": {
 			"type": "string",
 			"defaultValue": "10.0.0.0/24",
@@ -71,21 +78,25 @@
 				"publicIPAddressName": "[concat(variables('commonID'), '-sppip')]",
 				"loadBalancerFrontEnd": "[concat(variables('commonID'), '-splbfe')]",
 				"loadBalancerBackEndPool": "[concat(variables('commonID'), '-splbbep')]",
-				"lbName": "[concat(variables('commonID'), '-spLB')]"
-				
+				"lbName": "[concat(variables('commonID'), '-spLB')]",
+				"ProbeName": "[concat(variables('commonID'), '-spProbes')]",
+				"loadBalancerRules": "[concat(variables('commonID'), '-spLBRules')]"
 			},
 			"CA": {
 				// Public Load Balancer for Central Admin
 				"publicIPAddressName": "[concat(variables('commonID'), '-capip')]",
 				"loadBalancerFrontEnd": "[concat(variables('commonID'), '-calbfe')]",
 				"loadBalancerBackEndPool": "[concat(variables('commonID'), '-calbbep')]",
-				"lbName": "[concat(variables('commonID'), '-caLB')]"
+				"lbName": "[concat(variables('commonID'), '-caLB')]",
+				"NATName": "[concat(variables('commonID'), '-caNAT')]"
 			},
-			"SPAPPS": {
-				// Internal Load Balancer for App Servers
-				"loadBalancerFrontEnd": "[concat(variables('commonID'), '-spappslbfe')]",
-				"loadBalancerBackEndPool": "[concat(variables('commonID'), '-spappslbbep')]",
-				"lbName": "[concat(variables('commonID'), '-spappsLB')]"
+			"SQL": {
+				// Private Load Balancer for SQL
+				"loadBalancerFrontEnd": "[concat(variables('commonID'), '-sqllbfe')]",
+				"loadBalancerBackEndPool": "[concat(variables('commonID'), '-sqllbbep')]",
+				"lbName": "[concat(variables('commonID'), '-sqlLB')]",
+				"ProbeName": "[concat(variables('commonID'), '-sqlProbes')]",
+				"loadBalancerRules": "[concat(variables('commonID'), '-sqlLBRules')]"
 			},
 			"RDP": {
 				// Public Load Balancer for NAT of RDP
@@ -160,48 +171,6 @@
 				}
 			}
 		},
-		// Load Balancers
-		//// RDP
-		{
-			"apiVersion": "2015-06-15",
-			"name": "[variables('LoadBalancers').RDP.lbName]",
-			"type": "Microsoft.Network/loadBalancers",
-			"location": "[resourceGroup().location]",
-			"dependsOn": [
-				"[concat('Microsoft.Network/publicIPAddresses/', variables('LoadBalancers').RDP.publicIPAddressName)]"
-			],
-			"properties": {
-				"frontendIPConfigurations": [
-					{
-						"name": "[variables('LoadBalancers').RDP.loadBalancerFrontEnd]",
-						"properties": {
-							"publicIPAddress": {
-								"id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('LoadBalancers').RDP.publicIPAddressName)]"
-							}
-						}
-					}
-				],
-				"backendAddressPools": [
-					{
-						"name": "[variables('LoadBalancers').RDP.loadBalancerBackEndPool]"
-					}
-				],
-				"inboundNatRules": [
-					{
-						"name": "[variables('LoadBalancers').RDP.NATName]",
-						"properties": {
-							"frontendIPConfiguration": {
-								"id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('LoadBalancers').RDP.lbName),'/frontendIPConfigurations/',variables('LoadBalancers').RDP.loadBalancerFrontEnd)]"
-							},
-							"protocol": "tcp",
-							"frontendPort": 3389,
-							"backendPort": 3389,
-							"enableFloatingIP": false
-						}
-					}
-				]
-			}
-		},
 		// Availability Sets
 		{
 			"type": "Microsoft.Compute/availabilitySets",
@@ -270,6 +239,206 @@
 						"name": "[variables('Networking').subnetNames.spAppSubnetName]",
 						"properties": {
 							"addressPrefix": "[variables('Networking').subnets.spAppSubnet]"
+						}
+					}
+				]
+			}
+		},
+		// Load Balancers
+		//// RDP - Public facing IP and NAT on 3389
+		{
+			"apiVersion": "2015-06-15",
+			"name": "[variables('LoadBalancers').RDP.lbName]",
+			"type": "Microsoft.Network/loadBalancers",
+			"location": "[resourceGroup().location]",
+			"dependsOn": [
+				"[concat('Microsoft.Network/publicIPAddresses/', variables('LoadBalancers').RDP.publicIPAddressName)]"
+			],
+			"properties": {
+				"frontendIPConfigurations": [
+					{
+						"name": "[variables('LoadBalancers').RDP.loadBalancerFrontEnd]",
+						"properties": {
+							"publicIPAddress": {
+								"id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('LoadBalancers').RDP.publicIPAddressName)]"
+							}
+						}
+					}
+				],
+				"backendAddressPools": [
+					{
+						"name": "[variables('LoadBalancers').RDP.loadBalancerBackEndPool]"
+					}
+				],
+				"inboundNatRules": [
+					{
+						// Pass 3389 from front lb to backend vm
+						"name": "[variables('LoadBalancers').RDP.NATName]",
+						"properties": {
+							"frontendIPConfiguration": {
+								"id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('LoadBalancers').RDP.lbName),'/frontendIPConfigurations/',variables('LoadBalancers').RDP.loadBalancerFrontEnd)]"
+							},
+							"protocol": "tcp",
+							"frontendPort": 3389,
+							"backendPort": 3389,
+							"enableFloatingIP": false
+						}
+					}
+				]
+			}
+		},
+		//// CA - Public facing IP and NAT to 2013
+		{
+			"apiVersion": "2015-06-15",
+			"name": "[variables('LoadBalancers').CA.lbName]",
+			"type": "Microsoft.Network/loadBalancers",
+			"location": "[resourceGroup().location]",
+			"dependsOn": [
+				"[concat('Microsoft.Network/publicIPAddresses/', variables('LoadBalancers').CA.publicIPAddressName)]"
+			],
+			"properties": {
+				"frontendIPConfigurations": [
+					{
+						"name": "[variables('LoadBalancers').CA.loadBalancerFrontEnd]",
+						"properties": {
+							"publicIPAddress": {
+								"id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('LoadBalancers').CA.publicIPAddressName)]"
+							}
+						}
+					}
+				],
+				"backendAddressPools": [
+					{
+						"name": "[variables('LoadBalancers').CA.loadBalancerBackEndPool]"
+					}
+				],
+				"inboundNatRules": [
+					{
+						// Forward front end TCP 80 to backend 2013 on VM
+						"name": "[variables('LoadBalancers').CA.NATName]",
+						"properties": {
+							"frontendIPConfiguration": {
+								"id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('LoadBalancers').CA.lbName),'/frontendIPConfigurations/',variables('LoadBalancers').CA.loadBalancerFrontEnd)]"
+							},
+							"protocol": "tcp",
+							"frontendPort": 80,
+							"backendPort": 2013,
+							"enableFloatingIP": false
+						}
+					}
+				]
+			}
+		},
+		//// SPWeb - Public IP load balancer with rules.
+		{
+			"apiVersion": "2015-06-15",
+			"name": "[variables('LoadBalancers').SPWEB.lbName]",
+			"type": "Microsoft.Network/loadBalancers",
+			"location": "[resourceGroup().location]",
+			"dependsOn": [
+				"[concat('Microsoft.Network/publicIPAddresses/', variables('LoadBalancers').SPWEB.publicIPAddressName)]"
+			],
+			"properties": {
+				"frontendIPConfigurations": [
+					{
+						"name": "[variables('LoadBalancers').SPWEB.loadBalancerFrontEnd]",
+						"properties": {
+							"publicIPAddress": {
+								"id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('LoadBalancers').SPWEB.publicIPAddressName)]"
+							}
+						}
+					}
+				],
+				"backendAddressPools": [
+					{
+						"name": "[variables('LoadBalancers').SPWEB.loadBalancerBackEndPool]"
+					}
+				],
+				"loadBalancingRules": [
+					{
+						// Forward TCP 80 to backend VM TCP 80 as long as node is up.
+						"name": "[variables('LoadBalancers').SPWEB.loadBalancerRules]",
+						"properties": {
+							"frontendIPConfiguration": {
+								"id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('LoadBalancers').SPWEB.lbName),'/frontendIPConfigurations/',variables('LoadBalancers').SPWEB.loadBalancerFrontEnd)]"
+							},
+							"probe": {
+								"id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('LoadBalancers').SPWEB.lbName),'/probes/',variables('LoadBalancers').SPWEB.ProbeName)]"
+							},
+							"protocol": "Tcp",
+							"frontendPort": 80,
+							"backendPort": 80,
+							"enableFloatingIP": false
+						}
+					}
+				],
+				"probes": [
+					{
+						// HTTP probe that checks port 8080 (IIS) on each VM.
+						"name": "[variables('LoadBalancers').SPWEB.ProbeName]",
+						"properties": {
+							"protocol": "Http",
+							"port": 8080,
+							"intervalInSeconds": 15,
+							"numberOfProbes": 2,
+							"requestPath": "/iisstart.htm"
+						}
+					}
+				]
+			}
+		},
+		//// SQL - Internal LB running on static IP and static subnet.
+		{
+			"apiVersion": "2015-06-15",
+			"name": "[variables('LoadBalancers').SQL.lbName]",
+			"type": "Microsoft.Network/loadBalancers",
+			"location": "[resourceGroup().location]",
+			"properties": {
+				"frontendIPConfigurations": [
+					{
+						"name": "[variables('LoadBalancers').SQL.loadBalancerFrontEnd]",
+						"properties": {
+							// SQL uses static LB IP.
+							"privateIPAllocationMethod": "Static",
+							"privateIPAddress": "[parameters('sqlLBStaticIP')]",
+							"subnet": {
+								"id": "[concat(resourceId('Microsoft.Network/virtualNetworks', variables('Networking').vnetName),'/subnets/',variables('Networking').subnetNames.staticSubnetName)]"
+							}
+						}
+					}
+				],
+				"backendAddressPools": [
+					{
+						"name": "[variables('LoadBalancers').SQL.loadBalancerBackEndPool]"
+					}
+				],
+				"loadBalancingRules": [
+					{
+						// Forward TCP 1433 to backend VM TCP 1433 as long as node is up.
+						"name": "[variables('LoadBalancers').SQL.loadBalancerRules]",
+						"properties": {
+							"frontendIPConfiguration": {
+								"id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('LoadBalancers').SQL.lbName),'/frontendIPConfigurations/',variables('LoadBalancers').SQL.loadBalancerFrontEnd)]"
+							},
+							"probe": {
+								"id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('LoadBalancers').SQL.lbName),'/probes/',variables('LoadBalancers').SQL.ProbeName)]"
+							},
+							"protocol": "Tcp",
+							"frontendPort": 1433,
+							"backendPort": 1433,
+							"enableFloatingIP": true
+						}
+					}
+				],
+				"probes": [
+					{
+						// Probe each SQL always on using port 59999.
+						"name": "[variables('LoadBalancers').SQL.ProbeName]",
+						"properties": {
+							"protocol": "Tcp",
+							"port": 59999,
+							"intervalInSeconds": 5,
+							"numberOfProbes": 2
 						}
 					}
 				]
