@@ -1,0 +1,45 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"StorageAccountName": {
+			"value": "rdglabstorage"
+		},
+		"publicIPName": {
+			"value": "rdglab-ad-pip"
+		},
+		"publicIPAddressType": {
+			"value": "Dynamic"
+		},
+		"vmName": {
+			"value": "rdglab-ad"
+		},
+		"vmSize": {
+			"value": "Standard_DS1_V2"
+		},
+		"adminUserName": {
+			"value": "rgarrett"
+		},
+		"adminPassword": {
+			"value": "pa$$w0rd1"
+		},
+		"virtualNetworkName": {
+			"value": "rdglab-vnet"
+		},
+		"virtualNetworkResourceGroup": {
+			"value": "Infrastructure"
+		},
+		"subnet1Name": {
+			"value": "Subnet1"
+		},
+		"nicName": {
+			"value": "rdglab-ad-nic"
+		},
+		"domainName": {
+			"value": "rdglab.local"
+		},
+		"publicIPAddressDnsName": {
+			"value": "rdglab-ad"
+		}
+	}
+}

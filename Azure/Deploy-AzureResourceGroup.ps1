@@ -1,3 +1,6 @@
+# Deploy AZURE RM Templates
+# Created from https://github.com/Azure/azure-quickstart-templates
+
 #Requires -Version 3.0
 #Requires -Module AzureRM.Resources
 #Requires -Module Azure.Storage
@@ -50,6 +53,8 @@ if ($UploadArtifacts) {
         $StorageResourceGroupName = "ARMTempStorage"
         $subscriptionId = ((Get-AzureRmContext).Subscription.SubscriptionId).substring(0,24).Replace('-','')
         $StorageAccountName = "temp$subscriptionId"
+    } else {
+        $StorageResourceGroupName = $ResourceGroupName;
     }
 
     $StorageAccount = (Get-AzureRmStorageAccount | Where-Object{$_.StorageAccountName -eq $StorageAccountName})
