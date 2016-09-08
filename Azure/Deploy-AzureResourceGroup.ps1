@@ -50,9 +50,8 @@ if ($UploadArtifacts) {
 
     #if not storage account name was provided, use the temporary storage account
     if($StorageAccountName -eq "") {
-        $StorageResourceGroupName = "ARMTempStorage"
-        $subscriptionId = ((Get-AzureRmContext).Subscription.SubscriptionId).substring(0,24).Replace('-','')
-        $StorageAccountName = "temp$subscriptionId"
+        $StorageResourceGroupName = $ResourceGroupName;
+        $StorageAccountName = "$($ResourceGroupName.ToLower())temp";
     } else {
         $StorageResourceGroupName = $ResourceGroupName;
     }
