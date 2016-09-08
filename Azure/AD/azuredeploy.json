@@ -71,31 +71,15 @@
 		"dscUri": "[concat(parameters('_artifactsLocation'), '/DSC/package.zip', parameters('_artifactsLocationSasToken'))]",
 		"virtualMachineData": [
 			{
-				"name": "spwfe",
-				"pipName": "[concat(variables('commonID'), '-spwfe-pip')]",
-				"nicName": "[concat(variables('commonID'), '-spwfe-nic')]",
-				"vmName": "[concat(variables('commonID'), '-spwfe')]",
-				"dnsName": "[concat(variables('prefix'), '-spwfe')]",
-				"dscUri": "[replace(variables('dscUri'), 'package.zip', 'SPWFE.zip')]",
-				"dscData": {}
-			},
-			{
-				"name": "spapp",
-				"pipName": "[concat(variables('commonID'), '-spapp-pip')]",
-				"nicName": "[concat(variables('commonID'), '-spapp-nic')]",
-				"vmName": "[concat(variables('commonID'), '-spapp')]",
-				"dnsName": "[concat(variables('prefix'), '-spapp')]",
-				"dscUri": "[replace(variables('dscUri'), 'package.zip', 'SPAPP.zip')]",
-				"dscData": {}
-			},
-			{
-				"name": "sql",
-				"pipName": "[concat(variables('commonID'), '-sql-pip')]",
-				"nicName": "[concat(variables('commonID'), '-sql-nic')]",
-				"vmName": "[concat(variables('commonID'), '-sql')]",
-				"dnsName": "[concat(variables('prefix'), '-sql')]",
-				"dscUri": "[replace(variables('dscUri'), 'package.zip', 'SQL.zip')]",
-				"dscData": {}
+				"name": "ad",
+				"pipName": "[concat(variables('commonID'), '-ad-pip')]",
+				"nicName": "[concat(variables('commonID'), '-ad-nic')]",
+				"vmName": "[concat(variables('commonID'), '-ad')]",
+				"dnsName": "[concat(variables('prefix'), '-ad')]",
+				"dscUri": "[replace(variables('dscUri'), 'package.zip', 'AD.zip')]",
+				"dscData": {
+					"DomainName": "rdglab.local"
+				}
 			}
 		]
 	},
