@@ -2,6 +2,12 @@
 	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
 	"contentVersion": "1.0.0.0",
 	"parameters": {
+		"location": {
+			"type": "string",
+			"metadata": {
+				"description": "Datacenter location"
+			}
+		},
 		"storageAccountName": {
 			"type": "string",
 			"metadata": {
@@ -19,10 +25,10 @@
 				"description": "Type of storage account"
 			}
 		},
-		"publicIPName": {
+		"publicIPAddressName": {
 			"type": "string",
 			"metadata": {
-				"description": "Name of Public IP"
+				"description": "Name of Public IP address"
 			}
 		},
 		"publicIPAddressType": {
@@ -38,7 +44,7 @@
 		"publicIPAddressDnsName": {
 			"type": "string",
 			"metadata": {
-				"description": "Public IP DNS Name"
+				"description": "Public IP Address DNS Name"
 			}
 		},
 		"vmName": {
@@ -123,46 +129,47 @@
 				"description": "Network Interface Name"
 			}
 		},
-		"domainName": {
+		"dscUri": {
 			"type": "string",
 			"metadata": {
-				"description": "Domain Name"
+				"description": "Uri for DSC script"
 			}
 		},
-		"_artifactsLocation": {
+		"configurationFunction": {
 			"type": "string",
+			"defaultValue": "Main.ps1\\Main",
 			"metadata": {
-				"description": "The location of resources, such as templates and DSC modules, that the template depends on"
+				"description": "DSC Configuration Function"
 			}
 		},
-		"_artifactsLocationSasToken": {
-			"type": "securestring",
-			"defaultValue": "",
+		"dscData": {
+			"type": "object",
 			"metadata": {
-				"description": "Auto-generated token to access _artifactsLocation"
+				"description": "Data for DSC"
 			}
 		}
 	},
 	"variables": {
 		"vnetID": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
-		"subnet1Ref": "[concat(variables('vnetID'),'/subnets/', parameters('subnet1Name'))]",
-		"adConfigurationFunction": "CreateADPDC.ps1\\CreateADPDC"
+		"subnet1Ref": "[concat(variables('vnetID'),'/subnets/', parameters('subnet1Name'))]"
 	},
 	"resources": [
 		{
+			"comments": "Storage Account",
 			"type": "Microsoft.Storage/storageAccounts",
 			"name": "[parameters('storageAccountName')]",
 			"apiVersion": "2015-06-15",
-			"location": "[resourceGroup().location]",
+			"location": "[parameters('location')]",
 			"properties": {
 				"accountType": "[parameters('storageAccountType')]"
 			}
 		},
 		{
+			"comments": "VM Machine Public IP address",
 			"apiVersion": "2015-06-15",
 			"type": "Microsoft.Network/publicIPAddresses",
-			"name": "[parameters('publicIPName')]",
-			"location": "[resourceGroup().location]",
+			"name": "[parameters('publicIPAddressName')]",
+			"location": "[parameters('location')]",
 			"properties": {
 				"publicIPAllocationMethod": "[parameters('publicIPAddressType')]",
 				"dnsSettings": {
@@ -171,12 +178,13 @@
 			}
 		},
 		{
+			"comments": "VM NIC",
 			"apiVersion": "2015-06-15",
 			"type": "Microsoft.Network/networkInterfaces",
 			"name": "[parameters('nicName')]",
-			"location": "[resourceGroup().location]",
+			"location": "[parameters('location')]",
 			"dependsOn": [
-				"[concat('Microsoft.Network/publicIPAddresses/', parameters('publicIPName'))]"
+				"[concat('Microsoft.Network/publicIPAddresses/', parameters('publicIPAddressName'))]"
 			],
 			"properties": {
 				"ipConfigurations": [
@@ -185,7 +193,7 @@
 						"properties": {
 							"privateIPAllocationMethod": "Dynamic",
 							"publicIPAddress": {
-								"id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPName'))]"
+								"id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddressName'))]"
 							},
 							"subnet": {
 								"id": "[variables('subnet1Ref')]"
@@ -196,10 +204,11 @@
 			}
 		},
 		{
+			"comments": "Virtual Machine",
 			"apiVersion": "2015-06-15",
 			"type": "Microsoft.Compute/virtualMachines",
 			"name": "[parameters('vmName')]",
-			"location": "[resourceGroup().location]",
+			"location": "[parameters('location')]",
 			"dependsOn": [
 				"[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccountName'))]",
 				"[concat('Microsoft.Network/networkInterfaces/', parameters('nicName'))]"
@@ -223,7 +232,7 @@
 					"osDisk": {
 						"name": "osdisk",
 						"vhd": {
-							"uri": "[concat('http://',parameters('storageAccountName'),'.blob.core.windows.net/vhds/','osdisk.vhd')]"
+							"uri": "[concat('http://',parameters('storageAccountName'),'.blob.core.windows.net/vhds/', parameters('vmName'), '-osdisk.vhd')]"
 						},
 						"caching": "ReadWrite",
 						"createOption": "FromImage"
@@ -235,20 +244,14 @@
 							"id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('nicName'))]"
 						}
 					]
-				},
-				"diagnosticsProfile": {
-					"bootDiagnostics": {
-						"enabled": "true",
-						"storageUri": "[concat('http://',parameters('storageAccountName'),'.blob.core.windows.net')]"
-					}
 				}
 			},
 			"resources": [
 				{
 					"type": "extensions",
-					"name": "CreateADForest",
+					"name": "RunDSC",
 					"apiVersion": "2015-06-15",
-					"location": "[resourceGroup().location]",
+					"location": "[parameters('location')]",
 					"dependsOn": [
 						"[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
 					],
@@ -258,12 +261,12 @@
 						"typeHandlerVersion": "2.19",
 						"autoUpgradeMinorVersion": true,
 						"settings": {
-							"ModulesUrl": "[concat(parameters('_artifactsLocation'), '/', 'DSC', '/', 'CreateADPDC.zip', parameters('_artifactsLocationSasToken'))]",
-							"ConfigurationFunction": "[variables('adConfigurationFunction')]",
+							"ModulesUrl": "[parameters('dscUri')]",
+							"ConfigurationFunction": "[parameters('configurationFunction')]",
 							"Properties": {
-								"DomainName": "[parameters('domainName')]",
+								"Data": "[parameters('dscData')]",
 								"AdminCreds": {
-									"UserName": "[parameters('adminUsername')]",
+									"UserName": "[parameters('adminUserName')]",
 									"Password": "PrivateSettingsRef:AdminPassword"
 								}
 							}
