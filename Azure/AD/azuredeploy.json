@@ -66,16 +66,15 @@
 	},
 	"variables": {
 		"commonID": "[toLower(replace(resourceGroup().name, ' ', ''))]",
-		"prefix": "[concat('rdglab-', variables('commonID'))]",
 		"storageAccountName": "[concat('rdglab', variables('commonID'))]",
 		"dscUri": "[concat(parameters('_artifactsLocation'), '/DSC/package.zip', parameters('_artifactsLocationSasToken'))]",
 		"virtualMachineData": [
 			{
 				"name": "ad",
-				"pipName": "[concat(variables('commonID'), '-ad-pip')]",
-				"nicName": "[concat(variables('commonID'), '-ad-nic')]",
-				"vmName": "[concat(variables('commonID'), '-ad')]",
-				"dnsName": "[concat(variables('prefix'), '-ad')]",
+				"pipName": "rdglab-ad-pip",
+				"nicName": "rdglab-ad-nic",
+				"vmName": "rdglab-ad",
+				"dnsName": "rdglab-ad",
 				"dscUri": "[replace(variables('dscUri'), 'package.zip', 'AD.zip')]",
 				"dscData": {
 					"DomainName": "rdglab.local"
