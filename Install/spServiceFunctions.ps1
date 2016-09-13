@@ -342,7 +342,7 @@ function SP-ConfigureUPSS {
             # UPSS account is the UPS account.
             UpdateProcessIdentity $profileSyncService -svcName $spUPSAcctName;
             $profileSyncService.Update()
-            Write-Verbose "Waiting for User Profile Synchronization Service..."  -NoNewline
+            Write-Verbose "Waiting for User Profile Synchronization Service...";
             # Provision the User Profile Sync Service (machine uses same account as timer service)
             $profileServiceApp.SetSynchronizationMachine($env:COMPUTERNAME, $profileSyncService.Id, $spFarmAcctName, $spFarmAcctPWD);
             if (($profileSyncService.Status -ne "Provisioning") -and ($profileSyncService.Status -ne "Online")) {
@@ -1148,7 +1148,7 @@ function SP-ConfigureProjectServer {
         }
         # Create a Project Server Config DB
         $projServerDB = $global:dbPrefix + "_Config_PWA";
-        Write-Verbose "Creating Project Server database `"$projServerDB`"..." -NoNewline
+        Write-Verbose "Creating Project Server database `"$projServerDB`"...";
         $pwaDBState = Get-SPProjectDatabaseState -DatabaseServer $global:dbServer -Name $projServerDB;
         if (!$pwaDBState.Exists) {
             New-SPProjectDatabase -Name $projServerDB -ServiceApplication `
