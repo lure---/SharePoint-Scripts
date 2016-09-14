@@ -305,7 +305,7 @@ function SP-CreateUserProfileServiceApplication {
         SP-AddResourcesLink "User Profile Administration" ("_layouts/ManageUserProfileServiceApplication.aspx?ApplicationID=" +  $profileServiceApp.Id);
 
         # Configure User Profile Sync Service
-        if ($disableUPSS -ne $null -and $disableUPSS -eq $false) { SP-ConfigureUPSS; }
+        if ($global:disableUPSS -ne $null -and $global:disableUPSS -eq $false) { SP-ConfigureUPSS; }
     } catch {
         Write-Output $_
         Throw "Error provisioning the User Profile Service Application"
@@ -327,24 +327,24 @@ function SP-ConfigureUPSS {
         $profileServiceApp = Get-SPServiceApplication |?{$_.DisplayName -eq $global:userProfileServiceName}
         if ($profileServiceApp -eq $null) { throw "User Profile Service App not provisioned"; }
         # Get User Profile Synchronization Service
-        Write-Verbose "Checking User Profile Synchronization Service..." 
+        Write-Verbose "Checking User Profile Synchronization Service...";
         $profileSyncServices = @(Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Administration.ProfileSynchronizationServiceInstance"})
         $profileSyncService = $profileSyncServices | ? {MatchComputerName $_.Parent.Address $env:COMPUTERNAME}
         if (!($profileSyncServices | ? {$_.Status -eq "Online"})) {
             # Add Farm account to admins group.
-            AddAccountToAdmin -spAccountName $spFarmAcctName;
+            AddAccountToAdmin -spAccountName $global:spFarmAcctName;
             # Check for an existing UPS credentials timer job (e.g. from a prior provisioning attempt), and delete it
             $UPSCredentialsJob = Get-SPTimerJob | ? {$_.Name -eq "windows-service-credentials-FIMSynchronizationService"}
             if ($UPSCredentialsJob.Status -eq "Online") {
                 Write-Verbose "Deleting existing sync credentials timer job..."
                 $UPSCredentialsJob.Delete()
             }
-            # UPSS account is the UPS account.
-            UpdateProcessIdentity $profileSyncService -svcName $spUPSAcctName;
+            UpdateProcessIdentity $profileSyncService -svcName $global:spFarmAcctName;
             $profileSyncService.Update()
-            Write-Verbose "Waiting for User Profile Synchronization Service...";
-            # Provision the User Profile Sync Service (machine uses same account as timer service)
-            $profileServiceApp.SetSynchronizationMachine($env:COMPUTERNAME, $profileSyncService.Id, $spFarmAcctName, $spFarmAcctPWD);
+            Write-Host -ForegroundColor Yellow "Waiting for User Profile Synchronization Service...";
+            # Provision the User Profile Sync Service (using Timer Service Account)
+            if ($global:cachedFarmCreds -eq $null) { $global:cachedFarmCreds = SP-GetFarmCredential; }
+            $profileServiceApp.SetSynchronizationMachine($env:COMPUTERNAME, $profileSyncService.Id, $global:spFarmAcctName, $global:cachedFarmCreds.Password);
             if (($profileSyncService.Status -ne "Provisioning") -and ($profileSyncService.Status -ne "Online")) {
                 Write-Host -ForegroundColor Yellow "Waiting for User Profile Synchronization Service to start..." -NoNewline
             }
@@ -390,7 +390,7 @@ function SP-ConfigureUPSS {
     }
     finally {
         # Remove the Farm account from admins group.
-        RemoveAccountFromAdmin -spAccountName $spFarmAcctName;
+        RemoveAccountFromAdmin -spAccountName $global:spFarmAcctName;
     }
     Write-Host -Foregroundcolor Green "Done Configuring User Profile Sync Service";
 }
@@ -702,7 +702,7 @@ function SP-CreateExcelServiceApp {
         $excelServiceApp = Get-SPExcelServiceApplication
         # Get account credentials
         $excelAcct = $global:spServiceAcctName;
-        $excelAcctPWD = $spServiceAcctPWD;
+        $excelAcctPWD = $global:spServiceAcctPWD;
         $secPassword = ConvertTo-SecureString "$excelAcctPWD" -AsPlaintext -Force
         $unattendedAccount = New-Object System.Management.Automation.PsCredential $excelAcct,$secPassword
         # Set the group claim and admin principals
@@ -785,7 +785,7 @@ function SP-CreateVisioServiceApp {
         $serviceApplication = Get-SPServiceApplication -name $global:visioAppName
         # Get account credentials
         $visioAcct = $global:spServiceAcctName;
-        $visioAcctPWD = $spServiceAcctPwd;
+        $visioAcctPWD = $global:spServiceAcctPwd;
         $secPassword = ConvertTo-SecureString "$visioAcctPWD" -AsPlaintext -Force
         $unattendedAccount = New-Object System.Management.Automation.PsCredential $visioAcct,$secPassword
         # Set the group claim and admin principals
@@ -846,12 +846,12 @@ function SP-CreatePerformancePointServiceApp {
 
     $application = Get-SPPerformancePointServiceApplication | ? {$_.Name -eq $serviceConfig.Name}
     if ($application) {
-        $farmAcct = $spFarmAcctName;
+        $farmAcct = $global:spFarmAcctName;
         Write-Verbose "Granting $farmAcct rights to database $serviceDB..."
         Get-SPDatabase | Where {$_.Name -eq $serviceDB} | Add-SPShellAdmin -UserName $farmAcct
         Write-Verbose "Setting PerformancePoint Data Source Unattended Service Account..."
         $performancePointAcct = $global:spServiceAcctName;
-        $performancePointAcctPWD = $spServiceAcctPwd;
+        $performancePointAcctPWD = $global:spServiceAcctPwd;
         $secPassword = ConvertTo-SecureString "$performancePointAcctPWD" -AsPlaintext -Force
         $performancePointCredential = New-Object System.Management.Automation.PsCredential $performancePointAcct,$secPassword
         $application | Set-SPPerformancePointSecureDataValues -DataSourceUnattendedServiceAccount $performancePointCredential

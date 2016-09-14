@@ -24,7 +24,7 @@ $global:spSearchCrawlAcctName = "DOMAIN\spsearch";
 $global:spSearchCrawlAcctPwd = "mypassword";
 
 # MySite Host location
-$global:mySiteHost = "http://mysiteUrl";
+$global:mySiteHost = "http://$($env:computername):8080";
 
 # Logging Settings.
 $global:logDaysToKeepLogs = 2;
@@ -41,3 +41,5 @@ $global:queryServers = @($env:COMPUTERNAME);
 # Array of servrs with crawl components.
 $global:crawlServers = @($env:COMPUTERNAME);
 
+# Configure UPSS
+$global:disableUPSS = $false;

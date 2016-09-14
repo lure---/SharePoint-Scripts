@@ -9,17 +9,21 @@ function SP-ExecCommonSPServerProvisioning {
     # Disable loopback check.
     SP-DisableLoopback;
     # Create Farm
-    SP-CreateOrJoinFarm;
+    #SP-CreateOrJoinFarm;
 }
 
 function SP-GetFarmCredential {
+    # See if we have cached creds
+    if ($global:cachedFarmCreds -ne $null) { return $global:cachedFarmCreds; }
     # Prompt for the farm account credentials.
     if ($global:spFarmAcctName -ne $null -and $global:spFarmAcctPwd -ne $null) {
         $secpasswd = ConvertTo-SecureString $global:spFarmAcctPwd -AsPlainText -Force
-        return New-Object System.Management.Automation.PSCredential ($global:spFarmAcctName, $secpasswd);
+        $global:cachedFarmCreds = New-Object System.Management.Automation.PSCredential ($global:spFarmAcctName, $secpasswd);
+        return $global:cachedFarmCreds;
     }
     Write-Host -BackgroundColor Gray -ForegroundColor DarkBlue "Prompting for Farm Account:"
-    return $host.ui.PromptForCredential("Farm Setup", "Enter Farm Account Credentials:", "$:global:spFarmAcctName", "NetBiosUserName" )
+    $global:cachedFarmCreds = $host.ui.PromptForCredential("Farm Setup", "Enter Farm Account Credentials:", "$:global:spFarmAcctName", "NetBiosUserName" )
+    return $global:cachedFarmCreds;
 }
 
 function SP-DisableLoopback {
