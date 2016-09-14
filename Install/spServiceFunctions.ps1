@@ -398,9 +398,7 @@ function SP-ConfigureUPSS {
 function CreateUPSAsAdmin {
     # Create the UPS app.
     try {
-        $mySiteURL = "http://$env:COMPUTERNAME";
-        $mySitePort = 8080
-        $mySiteHostLocation = $mySiteURL + ":" + $mySitePort
+        $mySiteHostLocation = $global:mySiteHost;
         $global:userProfileServiceName = "User Profile Service Application";
         # Set the ProfileDBServer, SyncDBServer and SocialDBServer to the same value ($global:dbServer). 
         $profileDBServer = $global:dbServer

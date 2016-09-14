@@ -21,7 +21,7 @@ Use-RunAs;
 try {
     # Standard provisioning steps.
     SP-ExecCommonSPServerProvisioning
-    SP-ConfigureUPSS;
+    SP-CreateUserProfileServiceApplication
     # Post Configuration
     SP-PostInstallation;
 }

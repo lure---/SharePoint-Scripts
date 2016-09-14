@@ -9,7 +9,7 @@ function SP-ExecCommonSPServerProvisioning {
     # Disable loopback check.
     SP-DisableLoopback;
     # Create Farm
-    #SP-CreateOrJoinFarm;
+    if ($env:spdebug -eq $null -or $env:spdebug -ne "1") { SP-CreateOrJoinFarm;}
 }
 
 function SP-GetFarmCredential {
@@ -523,7 +523,7 @@ function SP-CreateSiteCollection($appPool, $database, $siteCollectionName, $site
 function SP-CreateMySiteHost {
     # Create the MySite Host.
     SP-CreateWebApp -appPool "MySite Host App Pool" -webAppName "MySite Host" `
-        -database ($global:dbPrefix + "_Content_MySiteHost") -url "http://$env:COMPUTERNAME" -port 8080
+        -database ($global:dbPrefix + "_Content_MySiteHost") -url $global:mySiteHost;
     SP-CreateSiteCollection -appPool "MySite Host App Pool" -database ($global:dbPrefix + "_Content_MySiteHost") `
         -siteCollectionName "MySite Host" -siteURL $global:mySiteHost -template "SPSMSITEHOST#0"
 }
