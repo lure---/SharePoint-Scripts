@@ -41,7 +41,8 @@ function SP-ChangeIndexLocation {
 
 function SP-CreateEnterpriseSearchServiceApp {
     $currentServer = Get-SPServer $env:COMPUTERNAME;
-    if ($currentServer.Role -ine "Search" -and $currentServer.Role -ine "Custom" -and $currentServer.Role -ine "SingleServerFarm") {
+    $spVer = (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell).Version.Major;
+    if ($spVer -ge 16 -and $currentServer.Role -ine "Search" -and $currentServer.Role -ine "Custom" -and $currentServer.Role -ine "SingleServerFarm") {
         Write-Warning "Current server is not a search, single server farm, or custom role";
         Write-Warning "Changing role to custom";
         Set-SPServer -Identity $env:COMPUTERNAME -Role Custom;
