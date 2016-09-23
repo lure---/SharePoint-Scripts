@@ -1,0 +1,76 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"storageAccountName": {
+			"type": "string",
+			"defaultValue": "[concat('rdglab', toLower(replace(resourceGroup().name, ' ', '')))]",
+			"metadata": {
+				"description": "Name of storage account"
+			}
+		},
+		"vmName": {
+			"type": "string",
+			"metadata": {
+				"description": "Name of the VM"
+			}
+		},
+		"vmSize": {
+			"type": "string",
+			"defaultValue": "Standard_DS1_V2",
+			"allowedValues": [
+				"Standard_DS1_V2",
+				"Standard_DS2_V2",
+				"Standard_DS3_V2",
+				"Standard_DS4_V2",
+				"Standard_DS5_V2"
+			],
+			"metadata": {
+				"description": "Size of the VM"
+			}
+		},
+		"nicName": {
+			"type": "string",
+			"metadata": {
+				"description": "Network Interface Name"
+			}
+		}
+	},
+	"variables": {
+		"commonID": "[toLower(replace(resourceGroup().name, ' ', ''))]",
+		"prefix": "[concat('rdglab-', variables('commonID'))]",
+		"storageAccountName": "[concat('rdglab', variables('commonID'))]"
+	},
+	"resources": [
+		{
+			"comments": "Virtual Machine",
+			"apiVersion": "2015-06-15",
+			"type": "Microsoft.Compute/virtualMachines",
+			"name": "[parameters('vmName')]",
+			"location": "[resourceGroup().location]",
+			"properties": {
+				"hardwareProfile": {
+					"vmSize": "[parameters('vmSize')]"
+				},
+				"storageProfile": {
+					"osDisk": {
+						"name": "osdisk",
+						"OsType":  "Windows",
+						"vhd": {
+							"uri": "[concat('http://',parameters('storageAccountName'),'.blob.core.windows.net/vhds/', parameters('vmName'), '-osdisk.vhd')]"
+						},
+						"caching": "ReadWrite",
+						"createOption": "Attach"
+					}
+				},
+				"networkProfile": {
+					"networkInterfaces": [
+						{
+							"id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('nicName'))]"
+						}
+					]
+				}
+			}
+		}
+	]
+}
