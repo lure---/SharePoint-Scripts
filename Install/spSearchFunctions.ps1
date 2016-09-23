@@ -251,7 +251,9 @@ function SP-CreateSearchTopology {
     # then check that it's actually being requested for the current server, then create it as required.
     if ($global:crawlServers -icontains $env:COMPUTERNAME) {
         # This server is a crawl server.
+        Write-Verbose "$env:COMPUTERNAME is a crawl server";
         # Admin Component
+        Write-Verbose "Adding admin component to $env:COMPUTERNAME";
         $adminComponentReady = SP-CreateTopologyComponent `
             -searchApp $searchApp `
             -searchTopology $clone `
@@ -260,6 +262,7 @@ function SP-CreateSearchTopology {
             -funcNewComp "New-SPEnterpriseSearchAdminComponent"
 
         # Content Processing Component
+        Write-Verbose "Adding content processing component to $env:COMPUTERNAME";
         $contentProcessingComponentReady = SP-CreateTopologyComponent `
             -searchApp $searchApp `
             -searchTopology $clone `
@@ -268,6 +271,7 @@ function SP-CreateSearchTopology {
             -funcNewComp "New-SPEnterpriseSearchContentProcessingComponent"
 
         # Analytics Component
+        Write-Verbose "Adding analytics component to $env:COMPUTERNAME";
         $analyticsProcessingComponentReady = SP-CreateTopologyComponent `
             -searchApp $searchApp `
             -searchTopology $clone `
@@ -276,6 +280,7 @@ function SP-CreateSearchTopology {
             -funcNewComp "New-SPEnterpriseSearchAnalyticsProcessingComponent"
 
         # Crawl Component
+        Write-Verbose "Adding crawl component to $env:COMPUTERNAME";
         $crawlComponentReady = SP-CreateTopologyComponent `
             -searchApp $searchApp `
             -searchTopology $clone `
@@ -285,13 +290,16 @@ function SP-CreateSearchTopology {
 
         # Remove Query components?
         if (!($global:queryServers -icontains $env:COMPUTERNAME)) {
+            Write-Verbose "$env:COMPUTERNAME is NOT a query server";
             # Index.
+            Write-Verbose "Removing index component from $env:COMPUTERNAME";
             $indexComponentReady = SP-RemoveTopologyComponent `
                 -searchApp $searchApp `
                 -searchTopology $clone `
                 -searchSvc $searchSvc `
                 -compName "Index"
             # Query.
+            Write-Verbose "Removing query component from $env:COMPUTERNAME";
             $queryComponentReady = SP-RemoveTopologyComponent `
                 -searchApp $searchApp `
                 -searchTopology $clone `
@@ -302,7 +310,9 @@ function SP-CreateSearchTopology {
 
     if ($global:queryServers -icontains $env:COMPUTERNAME) {
         # This server is a query server.
+        Write-Verbose "$env:COMPUTERNAME is a query server";
         # Index Component
+        Write-Verbose "Adding index component to $env:COMPUTERNAME";
         $indexComponentReady = SP-CreateTopologyComponent `
             -searchApp $searchApp `
             -searchTopology $clone `
@@ -311,6 +321,7 @@ function SP-CreateSearchTopology {
             -funcNewComp "SP-NewIndexSearchComponent"
 
         # Query Processing Component
+        Write-Verbose "Adding query component to $env:COMPUTERNAME";
         $queryComponentReady = SP-CreateTopologyComponent `
             -searchApp $searchApp `
             -searchTopology $clone `
@@ -320,7 +331,9 @@ function SP-CreateSearchTopology {
 
         # Remove crawl components?
         if (!($global:crawlServers -icontains $env:COMPUTERNAME)) {
+            Write-Verbose "$env:COMPUTERNAME is NOT a crawl server";
             # Admin Component
+            Write-Verbose "Removing admin component from $env:COMPUTERNAME";
             $adminComponentReady = SP-RemoveTopologyComponent `
                 -searchApp $searchApp `
                 -searchTopology $clone `
@@ -328,6 +341,7 @@ function SP-CreateSearchTopology {
                 -compName "Admin"
 
             # Content Processing Component
+            Write-Verbose "Removing content processing component from $env:COMPUTERNAME";
             $contentProcessingComponentReady = SP-RemoveTopologyComponent `
                 -searchApp $searchApp `
                 -searchTopology $clone `
@@ -335,6 +349,7 @@ function SP-CreateSearchTopology {
                 -compName "ContentProcessing"
 
             # Analytics Component
+            Write-Verbose "Removing analytics component from $env:COMPUTERNAME";
             $analyticsProcessingComponentReady = SP-RemoveTopologyComponent `
                 -searchApp $searchApp `
                 -searchTopology $clone `
@@ -342,6 +357,7 @@ function SP-CreateSearchTopology {
                 -compName "AnalyticsProcessing"
 
             # Crawl Component
+            Write-Verbose "Removing crawl component from $env:COMPUTERNAME";
             $crawlComponentReady = SP-RemoveTopologyComponent `
                 -searchApp $searchApp `
                 -searchTopology $clone `
