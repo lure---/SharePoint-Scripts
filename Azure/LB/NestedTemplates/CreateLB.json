@@ -1,0 +1,99 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"location": {
+			"type": "string",
+			"metadata": {
+				"description": "Datacenter location"
+			}
+		},
+		"publicIPAddressName": {
+			"type": "string",
+			"metadata": {
+				"description": "Name of Public IP address"
+			}
+		},
+		"publicIPAddressType": {
+			"type": "string",
+			"defaultValue": "Dynamic",
+			"allowedValues": [
+				"Dynamic"
+			],
+			"metadata": {
+				"description": "Type of Public Address"
+			}
+		},
+		"publicIPAddressDnsName": {
+			"type": "string",
+			"metadata": {
+				"description": "Public IP Address DNS Name"
+			}
+		},
+		"loadBalancerName": {
+			"type": "string",
+			"metadata": {
+				"description": "Load Balancer Name"
+			}
+		}
+	},
+	"variables": {
+		"lbID": "[resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName'))]",
+		"lbFEID": "[concat(variables('lbID'), '/frontendIPConfigurations/rdglab-lb-frontend')]"
+	},
+	"resources": [
+		{
+			"comments": "LB Public IP address",
+			"apiVersion": "2015-06-15",
+			"type": "Microsoft.Network/publicIPAddresses",
+			"name": "[parameters('publicIPAddressName')]",
+			"location": "[parameters('location')]",
+			"properties": {
+				"publicIPAllocationMethod": "[parameters('publicIPAddressType')]",
+				"dnsSettings": {
+					"domainNameLabel": "[parameters('publicIPAddressDnsName')]"
+				}
+			}
+		},
+		{
+			"name": "[parameters('loadBalancerName')]",
+			"type": "Microsoft.Network/loadBalancers",
+			"apiVersion": "2015-06-15",
+			"location": "[resourceGroup().location]",
+			"dependsOn": [
+				"[concat('Microsoft.Network/publicIPAddresses/', parameters('publicIPAddressName'))]"
+			],
+			"properties": {
+				"frontendIPConfigurations": [
+					{
+						"name": "rdglab-lb-frontend",
+						"properties": {
+							"publicIPAddress": {
+								"id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddressName'))]"
+							}
+						}
+					}
+				],
+				"backendAddressPools": [
+					{
+						"name": "rdglab-lb-backend",
+					}
+				],
+				"inboundNatRules": [
+					{
+						"name": "rdglab-lb-nat",
+						"properties": {
+							"frontendIPConfiguration": {
+								"id": "[variables('lbFEID')]"
+							},
+							"protocol": "tcp",
+							"frontendPort": 80,
+							"backendPort": 80,
+							"enableFloatingIP": false
+						}
+					}
+				]
+			}
+		}
+	]
+}

@@ -128,25 +128,6 @@
 			"metadata": {
 				"description": "Network Interface Name"
 			}
-		},
-		"dscUri": {
-			"type": "string",
-			"metadata": {
-				"description": "Uri for DSC script"
-			}
-		},
-		"configurationFunction": {
-			"type": "string",
-			"defaultValue": "Main.ps1\\Main",
-			"metadata": {
-				"description": "DSC Configuration Function"
-			}
-		},
-		"dscData": {
-			"type": "object",
-			"metadata": {
-				"description": "Data for DSC"
-			}
 		}
 	},
 	"variables": {
@@ -245,40 +226,7 @@
 						}
 					]
 				}
-			},
-			"resources": [
-				{
-					"type": "extensions",
-					"name": "RunDSC",
-					"apiVersion": "2015-06-15",
-					"location": "[parameters('location')]",
-					"dependsOn": [
-						"[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
-					],
-					"properties": {
-						"publisher": "Microsoft.Powershell",
-						"type": "DSC",
-						"typeHandlerVersion": "2.19",
-						"autoUpgradeMinorVersion": true,
-						"settings": {
-							"ModulesUrl": "[parameters('dscUri')]",
-							"ConfigurationFunction": "[parameters('configurationFunction')]",
-							"Properties": {
-								"Data": "[parameters('dscData')]",
-								"AdminCreds": {
-									"UserName": "[parameters('adminUserName')]",
-									"Password": "PrivateSettingsRef:AdminPassword"
-								}
-							}
-						},
-						"protectedSettings": {
-							"Items": {
-								"AdminPassword": "[parameters('adminPassword')]"
-							}
-						}
-					}
-				}
-			]
+			}
 		}
 	]
 }
