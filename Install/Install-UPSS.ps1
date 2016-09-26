@@ -20,8 +20,8 @@ $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
 Use-RunAs;
 try {
     # Standard provisioning steps.
-    SP-ExecCommonSPServerProvisioning
-    SP-CreateUserProfileServiceApplication
+    SP-ExecCommonSPServerProvisioning;
+    SP-CreateUserProfileServiceApplication;
     # Post Configuration
     SP-PostInstallation;
 }
