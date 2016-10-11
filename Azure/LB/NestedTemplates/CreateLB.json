@@ -39,8 +39,10 @@
 	},
 	"variables": {
 		"lbID": "[resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName'))]",
-		"lbFEID": "[concat(variables('lbID'), '/frontendIPConfigurations/rdglab-lb-frontend')]"
-	},
+		"lbFEID": "[concat(variables('lbID'), '/frontendIPConfigurations/rdglab-lb-frontend')]",
+		"lbBEID": "[concat(variables('lbID'), '/backendAddressPools/rdglab-lb-backend')]",
+		"lbProbeID": "[concat(variables('lbID'), '/probes/tcpProbe')]"
+		},
 	"resources": [
 		{
 			"comments": "LB Public IP address",
@@ -79,17 +81,35 @@
 						"name": "rdglab-lb-backend",
 					}
 				],
-				"inboundNatRules": [
+				"loadBalancingRules": [
 					{
-						"name": "rdglab-lb-nat",
+						"name": "LBRule",
 						"properties": {
 							"frontendIPConfiguration": {
 								"id": "[variables('lbFEID')]"
 							},
+							"backendAddressPool": {
+								"id": "[variables('lbBEID')]"
+							},
 							"protocol": "tcp",
 							"frontendPort": 80,
 							"backendPort": 80,
-							"enableFloatingIP": false
+							"enableFloatingIP": false,
+							"idleTimeoutInMinutes": 5,
+							"probe": {
+								"id": "[variables('lbProbeID')]"
+							}
+						}
+					}
+				],
+				"probes": [
+					{
+						"name": "tcpProbe",
+						"properties": {
+							"protocol": "tcp",
+							"port": 80,
+							"intervalInSeconds": 5,
+							"numberOfProbes": 2
 						}
 					}
 				]
