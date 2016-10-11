@@ -39,6 +39,8 @@ try {
     SP-CreateSubscriptionSettingsServiceApp;
     SP-CreateAppManagementServiceApp;
     SP-CreateSPUsageApp;
+    # Go configure search.
+    SP-CreateEnterpriseSearchServiceApp;
     # Create default web apps.
     SP-CreateDefaultWebApps
     # Post Configuration

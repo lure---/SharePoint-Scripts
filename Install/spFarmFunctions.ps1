@@ -455,15 +455,26 @@ function SP-CreateWebApp {
         $appPoolAccountSwitch = @{ApplicationPoolAccount = $($spAppPoolAcctName)}
     }
     # See if the we have the app already
-    Write-Verbose "Checking existence of web app $($url):$($port)";
-    $getSPWebApplication = Get-SPWebApplication "$($url):$($port)" -ErrorAction SilentlyContinue;
+    if ($port -eq $null) {
+        $appUrl = $url;
+    } else {
+        $appUrl = "$($url):$($port)";
+    }
+    Write-Verbose "Checking existence of web app $appUrl";
+    $getSPWebApplication = Get-SPWebApplication $appUrl -ErrorAction SilentlyContinue;
     if ($getSPWebApplication -eq $null) {
         Write-Verbose "Creating Web App `"$webAppName`""
         $hostHeaderSwitch = @{}
         $pathSwitch = @{}
         if ($hostheader -ne $null) { $hostHeaderSwitch = @{HostHeader = $hostHeader}; }
-        New-SPWebApplication -Name $webAppName -ApplicationPool $appPool -DatabaseServer $global:dbServer -DatabaseName $database `
-            -Url $url -Port $port -SecureSocketsLayer:$useSSL @hostHeaderSwitch @appPoolAccountSwitch @authProviderSwitch @pathSwitch | Out-Null
+        if ($port -eq $null) {
+            New-SPWebApplication -Name $webAppName -ApplicationPool $appPool -DatabaseServer $global:dbServer -DatabaseName $database `
+                -Url $url -SecureSocketsLayer:$useSSL @hostHeaderSwitch @appPoolAccountSwitch @authProviderSwitch @pathSwitch | Out-Null
+        } else {
+            New-SPWebApplication -Name $webAppName -ApplicationPool $appPool -DatabaseServer $global:dbServer -DatabaseName $database `
+                -Url $url -Port $port -SecureSocketsLayer:$useSSL @hostHeaderSwitch @appPoolAccountSwitch @authProviderSwitch @pathSwitch | Out-Null
+
+        }
         if (-not $?) { Throw "Failed to create web application" }
     }
     else {
